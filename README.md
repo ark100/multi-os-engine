@@ -18,6 +18,7 @@
 - Walk through our [Quick Start Tutorials](http://doc.multi-os-engine.org) to configure your development environment and learn how to develop applications using Multi-OS Engine.
 - Ask questions on the [Multi-OS Engine Forum](https://discuss.multi-os-engine.org/)
 - Submit issues to our [Issue Tracker](https://github.com/multi-os-engine/multi-os-engine/issues)
+- The latest information is on the [Blog](https://multi-os-engine.org/blog/) (or [migeran blog](https://www.migeran.com/blog))
 
 ## Building from Source Code
 
