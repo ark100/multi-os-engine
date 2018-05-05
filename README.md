@@ -4,6 +4,11 @@
 
 [Multi-OS Engine](http://multi-os-engine.org/) provides a Java runtime and Java interfaces to iOS platform API to develop native iOS applications with native look and feel, native performance, and portability of common Java logic modules from your Android Apps. It comes fully integrated with Android Studio hosted on macOS or Windows and contains all the development tools needed to develop an iOS app and publish to the App Store.
 
+## Quick Start
+(on macOS) IntelliJ IDEA / Android Studio
+- Preferences > Plugins > Browse repositories > "Multi-OS Engine Plugin" > Install
+- File > New > Multi-OS Engine Project > Multi-OS Engine (Java > Single View Application)
+
 ## Getting Started
 
 - [Install Multi-OS Engine](https://multi-os-engine.org/start/)
