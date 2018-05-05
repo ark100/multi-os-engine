@@ -1,3 +1,6 @@
+[![IDE plugin](https://img.shields.io/jetbrains/plugin/v/8559-multi-os-engine-plugin.svg)](https://plugins.jetbrains.com/plugin/8559-multi-os-engine-plugin)
+[![Gradle plugin](https://img.shields.io/bintray/v/multi-os-engine/maven/moe-gradle.svg)](https://bintray.com/multi-os-engine/maven/moe-gradle)
+
 # Multi-OS Engine
 
 ## Overview
