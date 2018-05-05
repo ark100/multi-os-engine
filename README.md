@@ -1,5 +1,5 @@
-[![IDE plugin](https://img.shields.io/jetbrains/plugin/v/8559-multi-os-engine-plugin.svg?maxAge=1800)](https://plugins.jetbrains.com/plugin/8559-multi-os-engine-plugin)
-[![Gradle plugin](https://img.shields.io/bintray/v/multi-os-engine/maven/moe-gradle.svg?maxAge=1800)](https://bintray.com/multi-os-engine/maven/moe-gradle)
+[![IDE plugin](https://img.shields.io/jetbrains/plugin/v/8559-multi-os-engine-plugin.svg?label=IDE+plugin&maxAge=1800)](https://plugins.jetbrains.com/plugin/8559-multi-os-engine-plugin)
+[![Gradle plugin](https://img.shields.io/bintray/v/multi-os-engine/maven/moe-gradle.svg?label=Gradle+plugin&maxAge=1800)](https://bintray.com/multi-os-engine/maven/moe-gradle)
 
 # Multi-OS Engine
 
