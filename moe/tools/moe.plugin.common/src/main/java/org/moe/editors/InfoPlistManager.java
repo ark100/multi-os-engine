@@ -47,6 +47,8 @@ public class InfoPlistManager {
     public static final String IPAD_NIB_FILE_KEY = "NSMainNibFile~ipad";
     public static final String IPHONE_MAIN_STORYBOARD_FILE_KEY = "UIMainStoryboardFile";
     public static final String IPAD_MAIN_STORYBOARD_FILE_KEY = "UIMainStoryboardFile~ipad";
+    public static final String MOE_MAIN_CLASS_KEY = "MOE.Main.Class";
+    public static final String LAUNCH_STORYBOARD_NAME_KEY = "UILaunchStoryboardName";
 
     private NSString portrait = new NSString(INTERFACE_ORIENTATIONS_PORTRAIT);
     private NSString upsideDown = new NSString(INTERFACE_ORIENTATIONS_UPSIDE_DOWN);
@@ -69,6 +71,8 @@ public class InfoPlistManager {
     private NSString ipadNibFile;
     private NSString iphoneStoryboardFile;
     private NSString ipadStoryboardFile;
+    private NSString mainClassName;
+    private NSString launchScreen;
 
     private File infoPlistFile;
     private DocumentChangeListener documentChangeListener;
@@ -80,14 +84,30 @@ public class InfoPlistManager {
         return styles;
     }
 
-    public InfoPlistManager(File infoPlist, DocumentChangeListener listener) throws PropertyListFormatException, ParserConfigurationException, SAXException, ParseException, IOException {
+    public InfoPlistManager(File infoPlist) throws Exception {
         this.infoPlistFile = infoPlist;
-        this.documentChangeListener = listener;
         load();
     }
 
-    public void load() throws ParserConfigurationException, ParseException, SAXException, PropertyListFormatException, IOException {
+    public InfoPlistManager(String content) throws Exception {
+        load(content);
+    }
+
+    public void load(String content) throws Exception {
+        this.rootDict = (NSDictionary) PropertyListParser.parse(content.getBytes("UTF-8"));
+        setValues();
+    }
+
+    public void setListener(DocumentChangeListener listener) {
+        this.documentChangeListener = listener;
+    }
+
+    public void load() throws Exception {
         this.rootDict = (NSDictionary) PropertyListParser.parse(infoPlistFile);
+        setValues();
+    }
+
+    private void setValues() {
         this.version = (NSString) rootDict.get(BUNDELE_VERSION_KEY);
         this.build = (NSString) rootDict.get(BUNDELE_BUILD_KEY);
         this.bundleId = (NSString) rootDict.get(BUNDELE_IDENTIFIER_KEY);
@@ -101,6 +121,8 @@ public class InfoPlistManager {
         this.ipadNibFile = (NSString) rootDict.get(IPAD_NIB_FILE_KEY);
         this.iphoneStoryboardFile = (NSString) rootDict.get(IPHONE_MAIN_STORYBOARD_FILE_KEY);
         this.ipadStoryboardFile = (NSString) rootDict.get(IPAD_MAIN_STORYBOARD_FILE_KEY);
+        this.mainClassName = (NSString) rootDict.get(MOE_MAIN_CLASS_KEY);
+        this.launchScreen = (NSString) rootDict.get(LAUNCH_STORYBOARD_NAME_KEY);
     }
 
     public String getVersion() {
@@ -115,7 +137,7 @@ public class InfoPlistManager {
             return;
         }
         if (version == null) {
-            version = new NSString(versionNumber);
+            this.version = new NSString(versionNumber);
             rootDict.put(BUNDELE_VERSION_KEY, version);
         } else {
             version.setContent(versionNumber);
@@ -137,7 +159,7 @@ public class InfoPlistManager {
             return;
         }
         if (build == null) {
-            build = new NSString(buildNumber);
+            this.build = new NSString(buildNumber);
             rootDict.put(BUNDELE_BUILD_KEY, version);
         } else {
             build.setContent(buildNumber);
@@ -159,7 +181,7 @@ public class InfoPlistManager {
             return;
         }
         if (bundleId == null) {
-            bundleId = new NSString(id);
+            this.bundleId = new NSString(id);
             rootDict.put(BUNDELE_IDENTIFIER_KEY, bundleId);
         } else {
             bundleId.setContent(id);
@@ -177,7 +199,7 @@ public class InfoPlistManager {
     }
 
     public void setInterfacePortrait(boolean interfacePortrait) {
-        setInterface(interfacePortrait, portrait);
+        setInterfaceOrientationIPhone(interfacePortrait, portrait);
     }
 
     public boolean isInterfacePortraitIPad() {
@@ -190,7 +212,7 @@ public class InfoPlistManager {
     }
 
     public void setInterfacePortraitIPad(boolean interfacePortrait) {
-        setInterfaceIPad(interfacePortrait, portrait);
+        setInterfaceOrientationIPad(interfacePortrait, portrait);
     }
 
     public boolean isInterfaceUpsideDown() {
@@ -201,7 +223,7 @@ public class InfoPlistManager {
     }
 
     public void setInterfaceUpsideDown(boolean interfaceUpsideDown) {
-        setInterface(interfaceUpsideDown, upsideDown);
+        setInterfaceOrientationIPhone(interfaceUpsideDown, upsideDown);
     }
 
     public boolean isInterfaceUpsideDownIPad() {
@@ -214,7 +236,7 @@ public class InfoPlistManager {
     }
 
     public void setInterfaceUpsideDownIPad(boolean interfaceUpsideDown) {
-        setInterfaceIPad(interfaceUpsideDown, upsideDown);
+        setInterfaceOrientationIPad(interfaceUpsideDown, upsideDown);
     }
 
     public boolean isInterfaceLandscapeLeft() {
@@ -225,7 +247,7 @@ public class InfoPlistManager {
     }
 
     public void setInterfaceLandscapeLeft(boolean interfaceLandscapeLeft) {
-        setInterface(interfaceLandscapeLeft, landscapeLeft);
+        setInterfaceOrientationIPhone(interfaceLandscapeLeft, landscapeLeft);
     }
 
     public boolean isInterfaceLandscapeLeftIPad() {
@@ -238,7 +260,7 @@ public class InfoPlistManager {
     }
 
     public void setInterfaceLandscapeLeftIPad(boolean interfaceLandscapeLeft) {
-        setInterfaceIPad(interfaceLandscapeLeft, landscapeLeft);
+        setInterfaceOrientationIPad(interfaceLandscapeLeft, landscapeLeft);
     }
 
     public boolean isInterfaceLandscapeRight() {
@@ -249,7 +271,7 @@ public class InfoPlistManager {
     }
 
     public void setInterfaceLandscapeRight(boolean interfaceLandscapeRight) {
-        setInterface(interfaceLandscapeRight, landscapeRight);
+        setInterfaceOrientationIPhone(interfaceLandscapeRight, landscapeRight);
     }
 
     public boolean isInterfaceLandscapeRightIPad() {
@@ -262,7 +284,7 @@ public class InfoPlistManager {
     }
 
     public void setInterfaceLandscapeRightIPad(boolean interfaceLandscapeRight) {
-        setInterfaceIPad(interfaceLandscapeRight, landscapeRight);
+        setInterfaceOrientationIPad(interfaceLandscapeRight, landscapeRight);
     }
 
     public boolean isHideStatusBar() {
@@ -341,10 +363,10 @@ public class InfoPlistManager {
 
     public String getInterfaceFile() {
         if (iphoneStoryboardFile != null) {
-            return iphoneStoryboardFile.getContent() + ".storyboard";
+            return iphoneStoryboardFile.getContent() + XcodeEditorManager.STORYBOARD_FILE;
         }
         if (iphoneNibFile != null) {
-            return iphoneNibFile.getContent() + ".xib";
+            return iphoneNibFile.getContent() + XcodeEditorManager.XIB_FILE;
         }
         return "-";
     }
@@ -352,48 +374,19 @@ public class InfoPlistManager {
     public void setInterfaceFile(String fullName) {
         boolean changed = false;
         if (fullName == null) {
-            if (iphoneNibFile != null) {
-                iphoneNibFile = null;
-                rootDict.remove(IPHONE_NIB_FILE_KEY);
-                changed = true;
-            }
-            if (iphoneStoryboardFile != null) {
-                iphoneStoryboardFile = null;
-                rootDict.remove(IPHONE_MAIN_STORYBOARD_FILE_KEY);
-                changed = true;
-            }
+            boolean removed1 = removeInterfceFile(iphoneStoryboardFile, IPHONE_MAIN_STORYBOARD_FILE_KEY);
+            boolean removed2 = removeInterfceFile(iphoneNibFile, IPHONE_NIB_FILE_KEY);
+            changed = removed1 || removed2;
         } else {
-            String name = fullName.substring(0, fullName.indexOf("."));
-            if (fullName.endsWith(".xib")) {
-                if (iphoneStoryboardFile != null) {
-                    iphoneStoryboardFile = null;
-                    rootDict.remove(IPHONE_MAIN_STORYBOARD_FILE_KEY);
-                    changed = true;
-                }
-                if (iphoneNibFile == null) {
-                    iphoneNibFile = new NSString(name);
-                    rootDict.put(IPHONE_NIB_FILE_KEY, iphoneNibFile);
-                    changed = true;
-                } else if (!iphoneNibFile.getContent().equals(name)) {
-                    iphoneNibFile.setContent(name);
-                }
+            String name = EditorUtil.getInterfaceNameWithoutExtension(fullName);
+            if (fullName.endsWith(XcodeEditorManager.XIB_FILE)) {
+                changed = setIphoneXibInterface(name);
             } else {
-                if (iphoneNibFile != null) {
-                    iphoneNibFile = null;
-                    rootDict.remove(IPHONE_NIB_FILE_KEY);
-                    changed = true;
-                }
-                if (iphoneStoryboardFile == null) {
-                    iphoneStoryboardFile = new NSString(name);
-                    rootDict.put(IPHONE_MAIN_STORYBOARD_FILE_KEY, iphoneStoryboardFile);
-                    changed = true;
-                } else if (!iphoneStoryboardFile.getContent().equals(name)) {
-                    iphoneStoryboardFile.setContent(name);
-                }
+                changed = setIphoneStoryboardInterface(name);
             }
         }
-
         if (changed) {
+            updateInterfaceFiles();
             if (documentChangeListener != null) {
                 documentChangeListener.documentChanged();
             }
@@ -402,10 +395,10 @@ public class InfoPlistManager {
 
     public String getInterfaceFileIPad() {
         if (ipadStoryboardFile != null) {
-            return ipadStoryboardFile.getContent() + ".storyboard";
+            return ipadStoryboardFile.getContent() + XcodeEditorManager.STORYBOARD_FILE;
         }
         if (ipadNibFile != null) {
-            return ipadNibFile.getContent() + ".xib";
+            return ipadNibFile.getContent() + XcodeEditorManager.XIB_FILE;
         }
         return "-";
     }
@@ -413,53 +406,89 @@ public class InfoPlistManager {
     public void setInterfaceFileIPad(String fullName) {
         boolean changed = false;
         if (fullName == null) {
-            if (ipadNibFile != null) {
-                ipadNibFile = null;
-                rootDict.remove(IPAD_NIB_FILE_KEY);
-                changed = true;
-            }
-            if (ipadStoryboardFile != null) {
-                ipadStoryboardFile = null;
-                rootDict.remove(IPAD_MAIN_STORYBOARD_FILE_KEY);
-                changed = true;
-            }
+            boolean removed1 = removeInterfceFile(ipadStoryboardFile, IPAD_MAIN_STORYBOARD_FILE_KEY);
+            boolean removed2 = removeInterfceFile(ipadNibFile, IPAD_NIB_FILE_KEY);
+            changed = removed1 || removed2;
         } else {
-            String name = fullName.substring(0, fullName.indexOf("."));
-            if (fullName.endsWith(".xib")) {
-                if (ipadStoryboardFile != null) {
-                    ipadStoryboardFile = null;
-                    rootDict.remove(IPAD_MAIN_STORYBOARD_FILE_KEY);
-                    changed = true;
-                }
-                if (ipadNibFile == null) {
-                    ipadNibFile = new NSString(name);
-                    rootDict.put(IPAD_NIB_FILE_KEY, ipadNibFile);
-                    changed = true;
-                } else if (!ipadNibFile.getContent().equals(name)) {
-                    ipadNibFile.setContent(name);
-                    changed = true;
-                }
+            String name = EditorUtil.getInterfaceNameWithoutExtension(fullName);
+            if (fullName.endsWith(XcodeEditorManager.XIB_FILE)) {
+                changed = setIpadXibInterface(name);
             } else {
-                if (ipadNibFile != null) {
-                    ipadNibFile = null;
-                    rootDict.remove(IPAD_NIB_FILE_KEY);
-                    changed = true;
-                }
-                if (ipadStoryboardFile == null) {
-                    ipadStoryboardFile = new NSString(name);
-                    rootDict.put(IPAD_MAIN_STORYBOARD_FILE_KEY, ipadStoryboardFile);
-                    changed = true;
-                } else if (!ipadStoryboardFile.getContent().equals(name)) {
-                    ipadStoryboardFile.setContent(name);
-                    changed = true;
-                }
+                changed = setIpadStoryboardInterface(name);
             }
         }
-
         if (changed) {
+            updateInterfaceFiles();
             if (documentChangeListener != null) {
                 documentChangeListener.documentChanged();
             }
+        }
+    }
+
+    private boolean removeInterfceFile(NSString interfaceFile, String key) {
+        if (interfaceFile != null) {
+            interfaceFile = null;
+            rootDict.remove(key);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean setInterfaceFile(NSString interfaceFile, String key, String name) {
+        if (interfaceFile == null) {
+            interfaceFile = new NSString(name);
+            rootDict.put(key, interfaceFile);
+            return true;
+        } else if (!interfaceFile.getContent().equals(name)) {
+            interfaceFile.setContent(name);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean setIpadXibInterface(String name) {
+        boolean removed = removeInterfceFile(ipadStoryboardFile, IPAD_MAIN_STORYBOARD_FILE_KEY);
+        boolean changed = setInterfaceFile(ipadNibFile, IPAD_NIB_FILE_KEY, name);
+        return removed || changed;
+    }
+
+    private boolean setIphoneXibInterface(String name) {
+        boolean removed = removeInterfceFile(iphoneStoryboardFile, IPHONE_MAIN_STORYBOARD_FILE_KEY);
+        boolean changed = setInterfaceFile(iphoneNibFile, IPHONE_NIB_FILE_KEY, name);
+        return removed || changed;
+    }
+
+    private boolean setIpadStoryboardInterface(String name) {
+        boolean removed = removeInterfceFile(ipadNibFile, IPAD_NIB_FILE_KEY);
+        boolean changed = setInterfaceFile(ipadStoryboardFile, IPAD_MAIN_STORYBOARD_FILE_KEY, name);
+        return removed || changed;
+    }
+
+    private boolean setIphoneStoryboardInterface(String name) {
+        boolean removed = removeInterfceFile(iphoneNibFile, IPHONE_NIB_FILE_KEY);
+        boolean changed = setInterfaceFile(iphoneStoryboardFile, IPHONE_MAIN_STORYBOARD_FILE_KEY, name);
+        return removed || changed;
+    }
+
+    public String getMainClassName() {
+        if (mainClassName != null) {
+            return mainClassName.getContent();
+        }
+        return "";
+    }
+
+    public void setMainClassName(String mainClass) {
+        if (mainClassName != null && mainClassName.getContent().equals(mainClass)) {
+            return;
+        }
+        if (mainClassName == null) {
+            this.mainClassName = new NSString(mainClass);
+            rootDict.put(MOE_MAIN_CLASS_KEY, mainClassName);
+        } else {
+            mainClassName.setContent(mainClass);
+        }
+        if (documentChangeListener != null) {
+            documentChangeListener.documentChanged();
         }
     }
 
@@ -479,15 +508,15 @@ public class InfoPlistManager {
         return new NSArray(newObjects);
     }
 
-    private void setInterface(boolean set, NSObject value) {
+    private void setInterfaceOrientationIPhone(boolean set, NSObject value) {
         if (interfaceOrientatios == null) {
-            interfaceOrientatios = new NSArray();
+            this.interfaceOrientatios = new NSArray();
             rootDict.put(INTERFACE_ORIENTATIONS_KEY, interfaceOrientatios);
         }
         interfaceOrientatios = setOrRemoveInterfaceOrientationValue(set, interfaceOrientatios, value, INTERFACE_ORIENTATIONS_KEY);
     }
 
-    private void setInterfaceIPad(boolean set, NSObject value) {
+    private void setInterfaceOrientationIPad(boolean set, NSObject value) {
         if (interfaceOrientatiosIPad == null) {
             interfaceOrientatiosIPad = new NSArray();
             rootDict.put(INTERFACE_ORIENTATIONS_IPAD_KEY, interfaceOrientatiosIPad);
@@ -513,5 +542,39 @@ public class InfoPlistManager {
             }
         }
         return array;
+    }
+
+    private void updateInterfaceFiles() {
+        this.iphoneNibFile = (NSString) rootDict.get(IPHONE_NIB_FILE_KEY);
+        this.ipadNibFile = (NSString) rootDict.get(IPAD_NIB_FILE_KEY);
+        this.iphoneStoryboardFile = (NSString) rootDict.get(IPHONE_MAIN_STORYBOARD_FILE_KEY);
+        this.ipadStoryboardFile = (NSString) rootDict.get(IPAD_MAIN_STORYBOARD_FILE_KEY);
+    }
+
+    public void setLaunchScreenFile(String launchScreenFile) {
+        if (launchScreen != null && launchScreen.getContent().equals(launchScreenFile)) {
+            return;
+        }
+        String name = EditorUtil.getInterfaceNameWithoutExtension(launchScreenFile);
+        if (launchScreen == null) {
+            this.launchScreen = new NSString(name);
+            rootDict.put(LAUNCH_STORYBOARD_NAME_KEY, launchScreen);
+        } else {
+            launchScreen.setContent(name);
+        }
+        if (documentChangeListener != null) {
+            documentChangeListener.documentChanged();
+        }
+    }
+
+    public String getLaunchScreenFile(XcodeEditorManager manager) {
+        if (launchScreen != null) {
+            String value = launchScreen.getContent();
+            Map<String, String> interfaces = manager.getInterfaceFilesNamesAndFullNames();
+            String name = manager.getInterfaceFilesNamesAndFullNames().get(value);
+            name = name == null ? "_" : name;
+            return name;
+        }
+        return "-";
     }
 }
