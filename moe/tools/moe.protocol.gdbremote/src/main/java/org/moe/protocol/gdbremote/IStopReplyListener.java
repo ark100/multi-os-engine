@@ -18,40 +18,38 @@ package org.moe.protocol.gdbremote;
 
 import java.util.Map;
 
+/**
+ * Stop Reply Listener interface.
+ */
 public interface IStopReplyListener {
 
-	/**
-	 * The process received a signal.
-	 *
-	 * @param signal
-	 *            signal code
-	 * @param info
-	 *            related info or null if not available
-	 */
-	public void processSignaled(byte signal, Map<String, String> info);
+    /**
+     * The process received a signal.
+     *
+     * @param signal signal code
+     * @param info   related info or null if not available
+     */
+    public void processSignaled(byte signal, Map<String, String> info);
 
-	/**
-	 * The process exited.
-	 *
-	 * @param status
-	 *            exit status
-	 */
-	public void processExited(byte status);
+    /**
+     * The process exited.
+     *
+     * @param status exit status
+     */
+    public void processExited(byte status);
 
-	/**
-	 * The process terminated.
-	 *
-	 * @param status
-	 *            termination status
-	 */
-	public void processTerminated(byte status);
+    /**
+     * The process terminated.
+     *
+     * @param status termination status
+     */
+    public void processTerminated(byte status);
 
-	/**
-	 * The process write to the output stream.
-	 *
-	 * @param output
-	 *            new content
-	 */
-	public void processOutput(String output);
+    /**
+     * The process write to the output stream.
+     *
+     * @param output new content
+     */
+    public void processOutput(String output);
 
 }
