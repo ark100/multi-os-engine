@@ -16,27 +16,39 @@ limitations under the License.
 
 package org.moe.common.ios;
 
-import org.moe.common.exec.AbstractExec;
 import org.moe.common.exec.ExecOutputCollector;
-import org.moe.common.exec.ExecRunner;
+import org.moe.common.exec.GradleExec;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class Device extends DeviceLauncher {
+/**
+ * Utility for listing connected iOS devices.
+ */
+public class Device {
 
-    public static List<DeviceInfo> getDevices() throws IOException {
+    /**
+     * Returns the list of connected iOS devices.
+     *
+     * @param projectFile Project file
+     * @return List of connected iOS devices.
+     * @throws IOException if an I/O error occurs
+     */
+    public static List<DeviceInfo> getDevices(File projectFile) throws IOException {
         List<DeviceInfo> result = new ArrayList<DeviceInfo>();
 
-        List<String> args = new ArrayList<String>();
+        if (projectFile == null) {
+            return result;
+        }
 
-        args.add("--list");
-
-        AbstractExec exec = createExecRunner(DeviceType.Device);
-        exec.getArguments().addAll(args);
+        GradleExec exec = new GradleExec(projectFile, null, projectFile);
+        exec.getArguments().add("moeListDevices");
+        exec.getArguments().add("-Dorg.gradle.daemon=true");
+        exec.getArguments().add("-Dorg.gradle.configureondemand=true");
 
         String output;
         try {
@@ -47,10 +59,10 @@ public class Device extends DeviceLauncher {
 
         String[] lines = output.split("\n");
 
-        for (String line: lines) {
+        for (String line : lines) {
             DeviceInfo device = parseDeviceInfo(line);
 
-            if(device != null) {
+            if (device != null) {
                 result.add(device);
             }
         }
@@ -58,6 +70,12 @@ public class Device extends DeviceLauncher {
         return result;
     }
 
+    /**
+     * Parses the line for device info.
+     *
+     * @param line Line to parse
+     * @return DeviceInfo or null
+     */
     private static DeviceInfo parseDeviceInfo(String line) {
         DeviceInfo device = null;
 
@@ -80,23 +98,5 @@ public class Device extends DeviceLauncher {
         device = new DeviceInfo(name, uuid);
 
         return device;
-    }
-
-    public static Process launchApp(String deviceUdid, String appPath, int jdwpPort, int remotePort, List<String> args) throws IOException {
-        AbstractExec exec = createExecRunner(DeviceType.Device);
-        List<String> execArgs = exec.getArguments();
-
-        execArgs.add("-a=" + appPath);
-        execArgs.add("-u=" + deviceUdid);
-
-        if (jdwpPort > 0) {
-            execArgs.add(String.format("-d=%s:%s", Integer.toString(jdwpPort), Integer.toString(remotePort)));
-        }
-
-        if ((args != null) && (args.size() != 0)) {
-            execArgs.addAll(args);
-        }
-
-        return exec.getRunner().execute();
     }
 }

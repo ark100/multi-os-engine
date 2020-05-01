@@ -25,6 +25,9 @@ import java.util.List;
  */
 public final class ArrayUtil {
 
+    /**
+     * Creates a new ArrayUtil instance.
+     */
     private ArrayUtil() {
     }
 
@@ -50,8 +53,7 @@ public final class ArrayUtil {
         int bLen = b.length;
 
         final Class<?> at = a.getClass().getComponentType();
-        @SuppressWarnings("unchecked")
-        final T[] c = (T[]) Array.newInstance(at, aLen + bLen);
+        @SuppressWarnings("unchecked") final T[] c = (T[])Array.newInstance(at, aLen + bLen);
         System.arraycopy(a, 0, c, 0, aLen);
         System.arraycopy(b, 0, c, aLen, bLen);
         return c;

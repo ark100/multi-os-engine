@@ -31,10 +31,25 @@ import java.util.HashMap;
  */
 public abstract class AbstractConfigurationAppender {
 
+    /**
+     * Configuration.
+     */
     private final AbstractConfiguration configuration;
+    /**
+     * Options.
+     */
     private final ArrayList<Option> options = new ArrayList<Option>();
+    /**
+     * Option-help map.
+     */
     private final HashMap<String, String> optionHelps = new HashMap<String, String>();
+    /**
+     * Option-example map.
+     */
     private final HashMap<String, String> optionExamples = new HashMap<String, String>();
+    /**
+     * Flag indicating that setup method has been executed.
+     */
     private boolean hasRunSetup = false;
 
     /**
@@ -96,7 +111,7 @@ public abstract class AbstractConfigurationAppender {
     }
 
     /**
-     * Runs the appender for the specified strings
+     * Runs the appender for the specified strings.
      *
      * @param options option strings
      */
@@ -135,8 +150,7 @@ public abstract class AbstractConfigurationAppender {
             ArrayList<String> args = new ArrayList<String>();
             args.add(option.optionName);
             for (Option option2 : options) {
-                if (option.propertyName.equals(option2.propertyName) &&
-                        !args.contains(option2.optionName)) {
+                if (option.propertyName.equals(option2.propertyName) && !args.contains(option2.optionName)) {
                     args.add(option2.optionName);
                 }
             }
@@ -151,7 +165,7 @@ public abstract class AbstractConfigurationAppender {
     }
 
     /**
-     * Does a lazy linebreak for the specified string
+     * Does a lazy linebreak for the specified string.
      *
      * @param value string to linebreak
      * @param width line width

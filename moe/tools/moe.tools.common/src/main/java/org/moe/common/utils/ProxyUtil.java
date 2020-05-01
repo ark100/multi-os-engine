@@ -36,7 +36,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class ProxyUtil {
 
     /**
-     * Logger
+     * Logger.
      */
     private static final Logger LOG = LoggerFactory.getLogger(ProxyUtil.class);
 
@@ -125,7 +125,8 @@ public class ProxyUtil {
      * @param remoteInput  output stream to remote's input
      * @return runnable for interrupt
      */
-    public static ProxyUtil create(final int localPort, final InputStream remoteOutput, final OutputStream remoteInput) {
+    public static ProxyUtil create(final int localPort, final InputStream remoteOutput,
+            final OutputStream remoteInput) {
         ProxyUtil proxy = new ProxyUtil(localPort, remoteOutput, remoteInput);
         proxy.start();
         return proxy;
@@ -170,6 +171,9 @@ public class ProxyUtil {
                 }
             }
 
+            /**
+             * Accept a connection.
+             */
             private void accept() {
                 if (Thread.currentThread().isInterrupted()) {
                     return;
@@ -196,6 +200,9 @@ public class ProxyUtil {
                 tryClose(socketOutput, "Closing socket output stream");
             }
 
+            /**
+             * Startup the proxy server.
+             */
             private void startup() {
                 if (Thread.currentThread().isInterrupted()) {
                     return;
@@ -225,11 +232,23 @@ public class ProxyUtil {
                 tryClose(remoteOutput, "Closing remote output failed");
             }
 
+            /**
+             * Create a stream forwarding thread.
+             * @param name Thread name
+             * @param is Input
+             * @param os Output
+             * @return Thread
+             */
             private Thread createForwardingThread(final String name, final InputStream is, final OutputStream os) {
                 return new Thread(new Runnable() {
 
-                    // Buffer
+                    /**
+                     * Buffer size.
+                     */
                     final int bufferSize = 16384;
+                    /**
+                     * Buffer.
+                     */
                     final byte[] buffer = new byte[bufferSize];
 
                     @Override
@@ -261,6 +280,12 @@ public class ProxyUtil {
         proxyThread.start();
     }
 
+    /**
+     * Try to close the specified Closeable.
+     *
+     * @param closeable   Closeable to close
+     * @param failMessage Failure message
+     */
     private void tryClose(Closeable closeable, String failMessage) {
         if (closeable != null) {
             CloseableUtil.tryClose(closeable, LOG, localPort + ": " + failMessage);
@@ -268,7 +293,7 @@ public class ProxyUtil {
     }
 
     /**
-     * Stops the
+     * Stops the proxy.
      */
     public synchronized void stop() {
         LOG.debug(localPort + ": Stopping proxy");

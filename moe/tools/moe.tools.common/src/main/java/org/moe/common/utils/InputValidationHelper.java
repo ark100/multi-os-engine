@@ -14,10 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package org.moe.common.constants;
+package org.moe.common.utils;
 
+/**
+ * Utility class for validation.
+ */
+public class InputValidationHelper {
+    /**
+     * Validates that a string is an integer.
+     *
+     * @param value String to check
+     * @return True iff the string is an integer
+     */
+    public static boolean isInteger(String value) {
+        if (value == null || value.isEmpty()) {
+            return false;
+        }
 
-public enum ProductType {
-    app,
-    ipa
+        try {
+            Integer.parseInt(value);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
 }

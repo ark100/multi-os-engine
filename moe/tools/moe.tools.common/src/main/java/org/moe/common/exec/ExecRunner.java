@@ -18,10 +18,21 @@ package org.moe.common.exec;
 
 import java.io.IOException;
 
+/**
+ * Executable runner.
+ */
 public class ExecRunner extends ExecRunnerBase {
 
+    /**
+     * Process builder.
+     */
     private final ProcessBuilder builder;
 
+    /**
+     * Created a new ExecRunner instance.
+     *
+     * @param builder Process builder
+     */
     ExecRunner(ProcessBuilder builder) {
         if (builder == null) {
             throw new NullPointerException();
@@ -29,6 +40,11 @@ public class ExecRunner extends ExecRunnerBase {
         this.builder = builder;
     }
 
+    /**
+     * Returns the ProcessBuilder.
+     *
+     * @return ProcessBuilder
+     */
     public ProcessBuilder getBuilder() {
         return builder;
     }
@@ -53,7 +69,13 @@ public class ExecRunner extends ExecRunnerBase {
         }
     }
 
-    public Process execute() throws IOException {
+    /**
+     * Startes the process and stream listeners.
+     *
+     * @return Process instance
+     * @throws IOException if an I/O error occurs
+     */
+    private Process execute() throws IOException {
         Process process = builder.start();
 
         if (listener != null) {
@@ -63,7 +85,12 @@ public class ExecRunner extends ExecRunnerBase {
 
         return process;
     }
-    
+
+    /**
+     * Composes the command line from the builder.
+     *
+     * @return Command line string
+     */
     public String commandLine() {
         String command = "";
         for (String arg : builder.command()) {
