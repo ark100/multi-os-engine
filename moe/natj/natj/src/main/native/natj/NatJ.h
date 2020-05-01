@@ -17,7 +17,7 @@ limitations under the License.
 #ifndef NatJ_NatJ_h
 #define NatJ_NatJ_h
 
-#include <jni.h>
+#include "jni.h"
 #include <ffi.h>
 #include <assert.h>
 #include <stdint.h>
@@ -97,11 +97,13 @@ limitations under the License.
 #import <TargetConditionals.h>
 #if TARGET_OS_IOS
 #define NATJ_PLATFORM "ios"
+#define NATJ_PLATFORM_ROOT_PACKAGE "apple"
 #elif TARGET_OS_TV
 #define NATJ_PLATFORM "tvos"
-#define NATJ_PLATFORM_ROOT_PACKAGE "ios"
+#define NATJ_PLATFORM_ROOT_PACKAGE "apple"
 #elif TARGET_OS_MAC
 #define NATJ_PLATFORM "mac"
+#define NATJ_PLATFORM_ROOT_PACKAGE "apple"
 #else
 #error "unsupported platform"
 #endif
@@ -489,6 +491,7 @@ extern jmethodID gGetNativeObjectPeerMethod;
 extern jmethodID gGetNativeObjectPeerPointerMethod;
 extern jmethodID gGetPointerPeerMethod;
 extern jmethodID gGetModifiersMethod;
+extern jmethodID gIsDefaultMethodMethod;
 extern jmethodID gGetReturnTypeMethod;
 extern jmethodID gGetParameterTypesMethod;
 extern jmethodID gGetMethodNameMethod;
@@ -1006,5 +1009,10 @@ bool removeWeakReference(JNIEnv* env, uint64_t reference);
  * @return the referenced object
  */
 jobject getWeakReference(JNIEnv* env, uint64_t reference);
+
+/**
+ * Prints the current thread's Java stack trace
+ */
+void natj_printJavaStackTrace(JNIEnv* env);
 
 #endif

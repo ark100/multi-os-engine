@@ -18,11 +18,11 @@ package objc.tests.natj.variadic;
 
 import org.moe.natj.c.map.CStringMapper;
 import org.moe.natj.general.VariadicArg;
-import mac.NSObject;
-import mac.coregraphics.struct.CGPoint;
-import mac.coregraphics.struct.CGRect;
-import mac.coregraphics.struct.CGSize;
-import mac.foundation.NSSet;
+import apple.NSObject;
+import apple.coregraphics.struct.CGPoint;
+import apple.coregraphics.struct.CGRect;
+import apple.coregraphics.struct.CGSize;
+import apple.foundation.NSSet;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -413,5 +413,10 @@ public class ObjCVariadicTest {
 
         Assert.assertTrue(block2.call_blockForExplicitWCharTs(3, a, a, b, b, a, a));
         Assert.assertFalse(block2.call_blockForExplicitWCharTs(3, a, a, b, b, a, b));
+    }
+
+    @Test
+    public void testFirstArgStringWithVariadics() {
+        Assert.assertTrue(VariadicClass.testFirstArgStringWithVariadics("Text", null));
     }
 }

@@ -119,6 +119,7 @@ jmethodID gGetNativeObjectPeerMethod = NULL;
 jmethodID gGetNativeObjectPeerPointerMethod = NULL;
 jmethodID gGetPointerPeerMethod = NULL;
 jmethodID gGetModifiersMethod = NULL;
+jmethodID gIsDefaultMethodMethod = NULL;
 jmethodID gGetReturnTypeMethod = NULL;
 jmethodID gGetParameterTypesMethod = NULL;
 jmethodID gGetMethodNameMethod = NULL;
@@ -217,9 +218,9 @@ std::mutex* MutexInstance::getMutex() {
   return ((MutexInstanceImpl*)this)->it->second.mutex;
 }
 
-ReferencedMutexContainer gMutexReferences;
+ReferencedMutexContainer& gMutexReferences = *new ReferencedMutexContainer();
 
-std::mutex gMutex;
+std::mutex& gMutex = *new std::mutex();
 
 void JNICALL Java_org_moe_natj_general_NatJ_initialize(JNIEnv* env, jclass clazz) {
   env->GetJavaVM(&gJVM);
@@ -312,10 +313,6 @@ void JNICALL Java_org_moe_natj_general_NatJ_initialize(JNIEnv* env, jclass clazz
       "org/moe/natj/general/VariadicArg$ByValueVariadicArg"));
   gNativeRuntimeClass = (jclass)env->NewGlobalRef(
       env->FindClass("org/moe/natj/general/NativeRuntime"));
-#ifdef __APPLE__
-  gObjCObjectPtrImplClass = (jclass)env->NewGlobalRef(
-      env->FindClass("org/moe/natj/general/ptr/impl/ObjCObjectPtrImpl"));
-#endif
 
   env->PopLocalFrame(NULL);
 
@@ -348,6 +345,14 @@ void JNICALL Java_org_moe_natj_general_NatJ_initialize(JNIEnv* env, jclass clazz
       env->GetMethodID(gNativeObjectClass, "getPeerPointer", "()J");
   gGetPointerPeerMethod = env->GetMethodID(gPointerClass, "getPeer", "()J");
   gGetModifiersMethod = env->GetMethodID(gMethodClass, "getModifiers", "()I");
+  gIsDefaultMethodMethod = env->GetMethodID(gMethodClass, "isDefault", "()Z");
+  if ((gIsDefaultMethodMethod == nullptr) != (env->ExceptionCheck())) {
+    LOGF << "Invalid state after getting method 'boolean java.lang.reflect.Method.isDefault()'!";
+  }
+  if (env->ExceptionCheck()) {
+    LOGD << "Method 'boolean java.lang.reflect.Method.isDefault()' is not accessible.";
+    env->ExceptionClear();
+  }
   gGetLibraryMethod =
       env->GetMethodID(gLibraryClass, "value", "()Ljava/lang/String;");
   gLookUpLibraryStaticMethod = env->GetStaticMethodID(
@@ -448,10 +453,6 @@ void JNICALL Java_org_moe_natj_general_NatJ_initialize(JNIEnv* env, jclass clazz
       env->GetMethodID(gNLongVariadicArgClass, "getNLong", "()J");
   gGetDefaultUnboxPolicyMethod =
       env->GetMethodID(gNativeRuntimeClass, "getDefaultUnboxPolicy", "()B");
-#ifdef __APPLE__
-  gRefreshRetainListMethod =
-      env->GetMethodID(gObjCObjectPtrImplClass, "refreshRetainList", "()V");
-#endif
 
   env->PushLocalFrame(50);
 
@@ -550,7 +551,17 @@ void JNICALL Java_org_moe_natj_general_NatJ_initialize(JNIEnv* env, jclass clazz
       gVariadicClass, env->GetStaticFieldID(gVariadicClass, "Unbox", "B"));
   assert(gUnboxVariadicPolicyValue != -1);
 
+#ifdef __APPLE__
+  gObjCObjectPtrImplClass = (jclass)env->NewGlobalRef(
+      env->FindClass("org/moe/natj/general/ptr/impl/ObjCObjectPtrImpl"));
+#endif
+
   env->PopLocalFrame(NULL);
+
+#ifdef __APPLE__
+  gRefreshRetainListMethod =
+      env->GetMethodID(gObjCObjectPtrImplClass, "refreshRetainList", "()V");
+#endif
 }
 
 void JNICALL Java_org_moe_natj_general_NatJ_handleShutdown(JNIEnv* env,
@@ -1671,4 +1682,22 @@ bool removeWeakReference(JNIEnv* env, uint64_t reference) {
 jobject getWeakReference(JNIEnv* env, uint64_t reference) {
   return env->CallStaticObjectMethod(gNatJClass, gGetWeakReferenceStaticMethod,
                                      reference);
+}
+
+void natj_printJavaStackTrace(JNIEnv *env) {
+  jclass cls = env->FindClass("java/lang/Exception");
+  if (cls != NULL) {
+    jmethodID constructor = env->GetMethodID(cls, "<init>", "()V");
+    if(constructor != NULL) {
+      jobject exc = env->NewObject(cls, constructor);
+      if(exc != NULL) {
+        jmethodID printStackTrace = env->GetMethodID(cls, "printStackTrace", "()V");
+        if(printStackTrace != NULL) {
+          env->CallObjectMethod(exc, printStackTrace);
+        }
+      }
+      env->DeleteLocalRef(exc);
+    }
+  }
+  env->DeleteLocalRef(cls);
 }

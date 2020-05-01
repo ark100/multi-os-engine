@@ -30,6 +30,7 @@ public class Pointer {
      */
     public interface Releaser {
         void release(long peer);
+        boolean ifFinalizedExternally();
     }
 
     /** The native pointer. */
@@ -48,6 +49,9 @@ public class Pointer {
      *      has been collected by the GC.
      */
     public Pointer(long peer, Releaser releaser) {
+        if (peer == -1) {
+            throw new IllegalArgumentException();
+        }
         this.peer = peer;
         this.releaser = releaser;
     }
@@ -58,6 +62,9 @@ public class Pointer {
      * @param peer The native peer pointer.
      */
     public Pointer(long peer) {
+        if (peer == -1) {
+            throw new IllegalArgumentException();
+        }
         this.peer = peer;
         this.releaser = null;
     }
@@ -66,8 +73,24 @@ public class Pointer {
      * Invokes the {@link #releaser releaser}'s {@link Releaser#release(long)} method.
      */
     protected void finalize() {
-        if (releaser != null && peer != 0) {
+        if (releaser != null && peer != 0 && !releaser.ifFinalizedExternally()) {
             releaser.release(peer);
+        }
+    }
+
+    /**
+     * Invokes the {@link #releaser releaser}'s {@link Releaser#release(long)} method.
+     *
+     * This method should only be accessed from {@link NativeObject}.
+     */
+    void release() {
+        if (releaser != null && peer != 0 && releaser.ifFinalizedExternally()) {
+            if (peer == -1) {
+                new RuntimeException("peer already released").printStackTrace();
+            } else {
+                releaser.release(peer);
+                peer = -1;
+            }
         }
     }
 
@@ -88,6 +111,9 @@ public class Pointer {
      * @return The native peer pointer.
      */
     public long getPeer() {
+        if (this.peer == -1) {
+            throw new IllegalStateException();
+        }
         return peer;
     }
 
@@ -97,6 +123,12 @@ public class Pointer {
      * @param peer The native peer pointer.
      */
     public void setPeer(long peer) {
+        if (peer == -1) {
+            throw new IllegalArgumentException();
+        }
+        if (this.peer == -1) {
+            throw new IllegalStateException();
+        }
         this.peer = peer;
     }
 

@@ -25,13 +25,15 @@ targetCompatibility = "1.8"
 
 dependencies {
     testCompile 'junit:junit:[4,)'
-    testCompile rootProject
+    compile rootProject
     testCompile files(System.getProperty("java.home") + "/../lib/tools.jar")
 }
 
 task processTestsClasses(type: JavaExec) {
+    dependsOn(sourceSets.test.output)
+
     args '-Dretrolambda.inputDir=build/classes/test'
-    args '-Dretrolambda.classpath=build/classes/test:../build/libs/natj.jar'
+    args "-Dretrolambda.classpath=build/classes/test:../build/libs/natj-${version}.jar"
     args '-Dretrolambda.defaultMethods=true'
     args '-Dretrolambda.natjSupport=true'
     args '-Dretrolambda.outputDir=build/classes/processedTestClasses'
@@ -41,14 +43,20 @@ task processTestsClasses(type: JavaExec) {
     inputs.files('build/classes/test')
     outputs.files('build/classes/processedTestClasses')
 }
-tasks.processTestsClasses.dependsOn(sourceSets.test.output)
 
 tasks.withType(Test) {
+    def nativeConfiguration = 'Release'
+    dependsOn tasks.processTestsClasses, ":natj-mac:build_TestClassesObjC_${nativeConfiguration}_macosx"
+
     doFirst {
         sourceSets.test.output.classesDir = 'build/classes/processedTestClasses'
     }
-    systemProperty 'java.library.path', file('../natj-mac/build/xcode/Release')
+    systemProperty 'java.library.path', file("../natj-mac/build/xcode/${nativeConfiguration}")
     testClassesDir = processTestsClasses.outputs.files[0]
     testLogging.showStandardStreams = true
+    if (rootProject.hasProperty("moe.use.addresssanitizer")) {
+        environment['DYLD_INSERT_LIBRARIES'] = '/Applications/Xcode.app/Contents/Developer/Toolchains/' +
+                'XcodeDefault.xctoolchain/usr/lib/clang/8.0.0/lib/darwin/libclang_rt.asan_osx_dynamic.dylib'
+        environment['ASAN_OPTIONS'] = 'handle_segv=0:allow_user_segv_handler=1'
+    }
 }
-tasks.test.dependsOn(tasks.processTestsClasses, ':natj-mac:buildObjCTestNative')

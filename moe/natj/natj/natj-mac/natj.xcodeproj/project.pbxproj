@@ -142,6 +142,8 @@
 		582249F81CB54BEB00757811 /* NativeDataSource.c in Sources */ = {isa = PBXBuildFile; fileRef = 582249CA1CB54BEB00757811 /* NativeDataSource.c */; };
 		58224A0D1CB54BEB00757811 /* Structs.h in Headers */ = {isa = PBXBuildFile; fileRef = 582249DF1CB54BEB00757811 /* Structs.h */; };
 		58271A9F1C7C593E003E7D62 /* DynamicTypes.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 58271A9D1C7C593E003E7D62 /* DynamicTypes.hpp */; };
+		583DAD151E3B5F2000E96F47 /* CustomClassNonExistInherited.h in Headers */ = {isa = PBXBuildFile; fileRef = 583DAD131E3B5F2000E96F47 /* CustomClassNonExistInherited.h */; };
+		583DAD161E3B5F2000E96F47 /* CustomClassNonExistInherited.m in Sources */ = {isa = PBXBuildFile; fileRef = 583DAD141E3B5F2000E96F47 /* CustomClassNonExistInherited.m */; };
 		58407C6E1C8EC28100EF8B81 /* Inheritance.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 58407C6D1C8EC27E00EF8B81 /* Inheritance.hpp */; };
 		584EDEE51C87389B00713BBC /* BaseTypes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 584EDEE41C87389B00713BBC /* BaseTypes.cpp */; };
 		588971BA1C8B3D7300D617EA /* VectorCounter.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 588971B91C8B3D7300D617EA /* VectorCounter.hpp */; };
@@ -185,6 +187,8 @@
 		58CE14FE1C6CF9F5001967D5 /* natj_cxx_stub.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 58CE14FD1C6CF9F5001967D5 /* natj_cxx_stub.cpp */; };
 		58D2BABF1CCF90CA00E62209 /* ObjCForceCasting.h in Headers */ = {isa = PBXBuildFile; fileRef = 58D2BABD1CCF90CA00E62209 /* ObjCForceCasting.h */; };
 		58D2BAC01CCF90CA00E62209 /* ObjCForceCasting.m in Sources */ = {isa = PBXBuildFile; fileRef = 58D2BABE1CCF90CA00E62209 /* ObjCForceCasting.m */; };
+		58E0AE921E2A5623007DA965 /* CustomBindingClassName.h in Headers */ = {isa = PBXBuildFile; fileRef = 58E0AE901E2A5623007DA965 /* CustomBindingClassName.h */; };
+		58E0AE931E2A5623007DA965 /* CustomBindingClassName.m in Sources */ = {isa = PBXBuildFile; fileRef = 58E0AE911E2A5623007DA965 /* CustomBindingClassName.m */; };
 		8B754D341CF74BE80088C102 /* ProtocolFactoryClass.h in Headers */ = {isa = PBXBuildFile; fileRef = 8B754D321CF74BE80088C102 /* ProtocolFactoryClass.h */; };
 		8B754D351CF74BE80088C102 /* ProtocolFactoryClass.m in Sources */ = {isa = PBXBuildFile; fileRef = 8B754D331CF74BE80088C102 /* ProtocolFactoryClass.m */; };
 		8B8F887F1CFDE4E8009D0B34 /* UnmanagedBinding.h in Headers */ = {isa = PBXBuildFile; fileRef = 8B8F887D1CFDE4E8009D0B34 /* UnmanagedBinding.h */; };
@@ -368,6 +372,8 @@
 		582249DF1CB54BEB00757811 /* Structs.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Structs.h; path = "../natj-ctests/src/test/native/Structs.h"; sourceTree = "<group>"; };
 		58271A9D1C7C593E003E7D62 /* DynamicTypes.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = DynamicTypes.hpp; sourceTree = "<group>"; };
 		582C2C311C90854C00A9E1F3 /* SizeofTest.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = SizeofTest.hpp; sourceTree = "<group>"; };
+		583DAD131E3B5F2000E96F47 /* CustomClassNonExistInherited.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CustomClassNonExistInherited.h; path = "../natj-objctests/src/test/native/CustomClassNonExistInherited.h"; sourceTree = "<group>"; };
+		583DAD141E3B5F2000E96F47 /* CustomClassNonExistInherited.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = CustomClassNonExistInherited.m; path = "../natj-objctests/src/test/native/CustomClassNonExistInherited.m"; sourceTree = "<group>"; };
 		58407C6D1C8EC27E00EF8B81 /* Inheritance.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Inheritance.hpp; sourceTree = "<group>"; };
 		584EDEE41C87389B00713BBC /* BaseTypes.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = BaseTypes.cpp; path = "../natj-cxxtests/src/test/native/BaseTypes.cpp"; sourceTree = "<group>"; };
 		588971B91C8B3D7300D617EA /* VectorCounter.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = VectorCounter.hpp; sourceTree = "<group>"; };
@@ -411,6 +417,8 @@
 		58CE14FD1C6CF9F5001967D5 /* natj_cxx_stub.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = natj_cxx_stub.cpp; path = "../natj-cxxtests/build/native-gen/natj_cxx_stub.cpp"; sourceTree = "<group>"; };
 		58D2BABD1CCF90CA00E62209 /* ObjCForceCasting.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ObjCForceCasting.h; path = "../natj-objctests/src/test/native/ObjCForceCasting.h"; sourceTree = "<group>"; };
 		58D2BABE1CCF90CA00E62209 /* ObjCForceCasting.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = ObjCForceCasting.m; path = "../natj-objctests/src/test/native/ObjCForceCasting.m"; sourceTree = "<group>"; };
+		58E0AE901E2A5623007DA965 /* CustomBindingClassName.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CustomBindingClassName.h; path = "../natj-objctests/src/test/native/CustomBindingClassName.h"; sourceTree = "<group>"; };
+		58E0AE911E2A5623007DA965 /* CustomBindingClassName.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = CustomBindingClassName.m; path = "../natj-objctests/src/test/native/CustomBindingClassName.m"; sourceTree = "<group>"; };
 		8B754D321CF74BE80088C102 /* ProtocolFactoryClass.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ProtocolFactoryClass.h; path = "../natj-objctests/src/test/native/ProtocolFactoryClass.h"; sourceTree = "<group>"; };
 		8B754D331CF74BE80088C102 /* ProtocolFactoryClass.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = ProtocolFactoryClass.m; path = "../natj-objctests/src/test/native/ProtocolFactoryClass.m"; sourceTree = "<group>"; };
 		8B8F887D1CFDE4E8009D0B34 /* UnmanagedBinding.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = UnmanagedBinding.h; path = "../natj-objctests/src/test/native/UnmanagedBinding.h"; sourceTree = "<group>"; };
@@ -861,8 +869,12 @@
 				58A7EA811CC026060091E246 /* ClusterClass.h */,
 				58A7EA821CC026060091E246 /* ClusterClass.m */,
 				58A7EAC51CC041080091E246 /* Common_Defines.h */,
+				58E0AE901E2A5623007DA965 /* CustomBindingClassName.h */,
+				58E0AE911E2A5623007DA965 /* CustomBindingClassName.m */,
 				58A7EA831CC026060091E246 /* CustomClassA.h */,
 				58A7EA841CC026060091E246 /* CustomClassA.m */,
+				583DAD131E3B5F2000E96F47 /* CustomClassNonExistInherited.h */,
+				583DAD141E3B5F2000E96F47 /* CustomClassNonExistInherited.m */,
 				58A7EA851CC026060091E246 /* InstrumentedParent.h */,
 				58A7EA861CC026060091E246 /* InstrumentedParent.m */,
 				8BAB27621CF481720076626D /* MappingClass.h */,
@@ -1035,8 +1047,10 @@
 				58A7EAA51CC026060091E246 /* NativeDataSource.h in Headers */,
 				58A7EAB31CC026060091E246 /* ObjC+Methods+Variadic.h in Headers */,
 				58A7EAB11CC026060091E246 /* ObjC+Methods+Struct.h in Headers */,
+				583DAD151E3B5F2000E96F47 /* CustomClassNonExistInherited.h in Headers */,
 				58A7EAB91CC026060091E246 /* ObjCUtility.h in Headers */,
 				8BAB27641CF481720076626D /* MappingClass.h in Headers */,
+				58E0AE921E2A5623007DA965 /* CustomBindingClassName.h in Headers */,
 				58A7EAB71CC026060091E246 /* ObjCBlocks.h in Headers */,
 				58A7EA9F1CC026060091E246 /* ClusterClass.h in Headers */,
 				8B8F88831CFDE6D2009D0B34 /* UnmanagedProtocolProxyManager.h in Headers */,
@@ -1142,7 +1156,7 @@
 		23E37DAB17CE759700844AD6 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastUpgradeCheck = 0720;
+				LastUpgradeCheck = 0820;
 				TargetAttributes = {
 					1E0345821B5E83D500DB0D19 = {
 						CreatedOnToolsVersion = 6.4;
@@ -1278,6 +1292,7 @@
 				58A7EAA01CC026060091E246 /* ClusterClass.m in Sources */,
 				58D2BAC01CCF90CA00E62209 /* ObjCForceCasting.m in Sources */,
 				8B754D351CF74BE80088C102 /* ProtocolFactoryClass.m in Sources */,
+				58E0AE931E2A5623007DA965 /* CustomBindingClassName.m in Sources */,
 				58A7EAB21CC026060091E246 /* ObjC+Methods+Struct.m in Sources */,
 				58A7EAB61CC026060091E246 /* ObjCBlocks_Nested.m in Sources */,
 				58A7EAA81CC026060091E246 /* NSStringInstrumentor.m in Sources */,
@@ -1286,6 +1301,7 @@
 				58A7EAAA1CC026060091E246 /* ObjC+Methods+Exception.m in Sources */,
 				58A7EAA41CC026060091E246 /* InstrumentedParent.m in Sources */,
 				58A7EAB81CC026060091E246 /* ObjCBlocks.m in Sources */,
+				583DAD161E3B5F2000E96F47 /* CustomClassNonExistInherited.m in Sources */,
 				58A7EAA21CC026060091E246 /* CustomClassA.m in Sources */,
 				58A7EAAC1CC026060091E246 /* ObjC+Methods+ObjectPtr.m in Sources */,
 				8B8F88881CFDE74B009D0B34 /* UnmanagedNativeBlockManager.m in Sources */,
@@ -1401,12 +1417,30 @@
 		23E37DAF17CE759700844AD6 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_CXX_LANGUAGE_STANDARD = "c++14";
 				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 10.9;
 				ONLY_ACTIVE_ARCH = YES;
 				OTHER_CFLAGS = (
@@ -1426,10 +1460,28 @@
 		23E37DB017CE759700844AD6 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_CXX_LANGUAGE_STANDARD = "c++14";
 				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 10.9;
 				OTHER_CFLAGS = (
 					"-fexceptions",
@@ -1451,12 +1503,10 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				EXECUTABLE_PREFIX = lib;
 				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
-				HEADER_SEARCH_PATHS = (
-					"\"$(SRCROOT)/../../../../external/libffi/darwin_common/include\"",
-					"\"$(SRCROOT)/../../../../external/libffi/darwin_osx/include\"",
-				);
+				HEADER_SEARCH_PATHS = "\"$(MOE_PREBUILTS_DIR)/external/libffi/build/macos/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/include\"";
 				LD_DYLIB_INSTALL_NAME = "@rpath/libnatj.dylib";
-				LIBRARY_SEARCH_PATHS = "\"$(SRCROOT)/../../../../external/libffi/build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"";
+				LIBRARY_SEARCH_PATHS = "\"$(MOE_PREBUILTS_DIR)/external/libffi/build/macos/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"";
+				MOE_PREBUILTS_DIR = "$(SRCROOT)/../../../../prebuilts";
 				OTHER_LDFLAGS = "-lffi";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -1468,12 +1518,10 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				EXECUTABLE_PREFIX = lib;
-				HEADER_SEARCH_PATHS = (
-					"\"$(SRCROOT)/../../../../external/libffi/darwin_common/include\"",
-					"\"$(SRCROOT)/../../../../external/libffi/darwin_osx/include\"",
-				);
+				HEADER_SEARCH_PATHS = "\"$(MOE_PREBUILTS_DIR)/external/libffi/build/macos/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/include\"";
 				LD_DYLIB_INSTALL_NAME = "@rpath/libnatj.dylib";
-				LIBRARY_SEARCH_PATHS = "\"$(SRCROOT)/../../../../external/libffi/build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"";
+				LIBRARY_SEARCH_PATHS = "\"$(MOE_PREBUILTS_DIR)/external/libffi/build/macos/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"";
+				MOE_PREBUILTS_DIR = "$(SRCROOT)/../../../../prebuilts";
 				OTHER_LDFLAGS = "-lffi";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -1664,6 +1712,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1705,6 +1754,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = NO;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;

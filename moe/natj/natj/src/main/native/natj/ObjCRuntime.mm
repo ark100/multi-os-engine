@@ -560,7 +560,7 @@ jobjectArray Java_org_moe_natj_objc_ObjCRuntime_createDataForNativeProtocolProxy
   jsize methodCount = env->GetArrayLength(methods);
   
   jobject* protocolMethods = (jobject*)alloca(sizeof(void*) * methodCount);
-  size_t protocolMethodCount = 0;
+  jsize protocolMethodCount = 0;
   
   // Collect protocol methods
   for (jsize i = 0; i < methodCount; i++) {
@@ -1063,6 +1063,8 @@ void Java_org_moe_natj_objc_ObjCRuntime_destroyWeak(JNIEnv* env,
 
 void Java_org_moe_natj_objc_ObjCRuntime_associateObjCObject(
     JNIEnv* env, jclass clazz, jlong object, jlong instance) {
+  if (object == instance)
+    return;
   id obj = reinterpret_cast<id>(object);
   @synchronized(obj) {
     CountedAssociationHolder* associationHolder =
@@ -1079,6 +1081,8 @@ void Java_org_moe_natj_objc_ObjCRuntime_associateObjCObject(
 
 void Java_org_moe_natj_objc_ObjCRuntime_dissociateObjCObject(
     JNIEnv* env, jclass clazz, jlong object, jlong instance) {
+  if (object == instance)
+    return;
   id obj = reinterpret_cast<id>(object);
   @synchronized(obj) {
     CountedAssociationHolder* associationHolder =
@@ -1434,30 +1438,54 @@ Class registerObjCClass(JNIEnv* env, jclass type, bool isProxy, jstring baseClas
   {
     if (isProxy) {
       classJName = (jstring)env->CallObjectMethod(type, gGetClassNameMethod);
+      classCName = env->GetStringUTFChars(classJName, NULL);
     } else {
       jclass originalClass = isCategory ? categClass : type;
-      jobject classAnn = env->CallObjectMethod(
-          originalClass, gGetAnnotationMethod, gObjCClassNameClass);
-      if (!env->IsSameObject(classAnn, NULL)) {
-        classJName =
-            (jstring)env->CallObjectMethod(classAnn, gGetObjCClassNameMethod);
-        env->DeleteLocalRef(classAnn);
-      } else {
-        if (isOriginalBinding) {
-          classJName = (jstring)env->CallObjectMethod(
-              originalClass, gGetClassSimpleNameMethod);
+
+      bool first_candidate = true;
+      while (true) {
+        jobject classAnn = env->CallObjectMethod(
+            originalClass, gGetAnnotationMethod, gObjCClassNameClass);
+        if (!env->IsSameObject(classAnn, NULL)) {
+          classJName =
+              (jstring)env->CallObjectMethod(classAnn, gGetObjCClassNameMethod);
+          env->DeleteLocalRef(classAnn);
         } else {
-          classJName = (jstring)env->CallObjectMethod(originalClass,
-                                                      gGetClassNameMethod);
+          if (isOriginalBinding) {
+            classJName = (jstring)env->CallObjectMethod(
+                originalClass, gGetClassSimpleNameMethod);
+          } else {
+            classJName = (jstring)env->CallObjectMethod(originalClass,
+                                                        gGetClassNameMethod);
+          }
+        }
+
+        classCName = env->GetStringUTFChars(classJName, NULL);
+
+        // Check wheter the Objective-C class is already present
+        objcClass = objc_getClass(classCName);
+
+        // A binding must refer to an existing class.
+        if (isOriginalBinding && !objcClass) {
+          originalClass = env->GetSuperclass(originalClass);
+
+          if (env->IsSameObject(originalClass, NULL)) {
+            break;
+          }
+
+          if (first_candidate) {
+            first_candidate = false;
+            LOGW << "Binding class refers to class " << classCName
+                 << ", but it can not be found. Fallback to indirect super class.";
+          }
+
+          env->ReleaseStringUTFChars(classJName, classCName);
+          env->DeleteLocalRef(classJName);
+        } else {
+          break;
         }
       }
     }
-    classCName = env->GetStringUTFChars(classJName, NULL);
-  }
-
-  // Check wheter the Objective-C class is already present
-  if (!isProxy) {
-    objcClass = objc_getClass(classCName);
   }
 
   // A category must refer to an existing class.
@@ -1556,6 +1584,7 @@ Class registerObjCClass(JNIEnv* env, jclass type, bool isProxy, jstring baseClas
     // Add main methods
     if (!isHybridClass(superClass)) {
       class_addMethod(objcMetaClass, @selector(alloc), (IMP)alloc_objc, "@@:");
+      class_addMethod(objcMetaClass, @selector(allocWithZone:), (IMP)alloc_objc_zone, "@@:^{_NSZone=}");
       class_addMethod(objcClass, @selector(retain), (IMP)retain_common, "@@:");
       class_addMethod(objcClass, @selector(retainWeakReference),
                       (IMP)retainWeakReference_common, "c@:");
@@ -1620,6 +1649,7 @@ Class registerObjCClass(JNIEnv* env, jclass type, bool isProxy, jstring baseClas
     } else {
       if (isBindingClass(superClass)) {
         class_addMethod(newMetaClass, @selector(alloc), (IMP)alloc_objc, "@@:");
+        class_addMethod(objcMetaClass, @selector(allocWithZone:), (IMP)alloc_objc_zone, "@@:^{_NSZone=}");
         class_addMethod(newClass, @selector(retain), (IMP)retain_common, "@@:");
         class_addMethod(newClass, @selector(retainWeakReference),
                         (IMP)retainWeakReference_common, "c@:");
@@ -1674,7 +1704,9 @@ Class registerObjCClass(JNIEnv* env, jclass type, bool isProxy, jstring baseClas
 
       // We are handling native methods only of original classes
       if (isAbstract || (!isNewClass && !isNative) ||
-          env->CallBooleanMethod(method, gIsSyntheticMethodMethod)) {
+          env->CallBooleanMethod(method, gIsSyntheticMethodMethod) ||
+          (gIsDefaultMethodMethod != nullptr &&
+           env->CallBooleanMethod(method, gIsDefaultMethodMethod))) {
         env->PopLocalFrame(NULL);
         continue;
       }
@@ -1704,7 +1736,7 @@ Class registerObjCClass(JNIEnv* env, jclass type, bool isProxy, jstring baseClas
             env->ThrowNew(gUnsupportedAnnotationExceptionClass,
                 "Property annotation is supported for getters "
                 "returning only subclasses of NSObject");
-            return;
+            return nullptr;
         }
         
         jobject propAnn = env->CallObjectMethod(method, gGetAnnotationMethod, gSelectorClass);

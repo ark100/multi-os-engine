@@ -27,7 +27,7 @@ import org.moe.natj.objc.ObjCRuntime;
 import org.moe.natj.objc.ann.ObjCBlock;
 import org.moe.natj.objc.ann.ObjCClassBinding;
 import org.moe.natj.objc.ann.Selector;
-import mac.NSObject;
+import apple.NSObject;
 
 @Runtime(ObjCRuntime.class)
 @ObjCClassBinding
@@ -522,4 +522,14 @@ public class VariadicClass extends NSObject {
         @Variadic()
         public boolean call_blockForExplicitWCharTs(int n, VariadicArg.WCharTVariadicArg... varargs);
     }
+
+
+    /*
+     * Methods for implicitly mapped objects
+     */
+
+    @Variadic()
+    @Selector("testFirstArgString:withVariadics:")
+    public static native boolean testFirstArgStringWithVariadics(String str,
+                                                                 String others, Object... arargs);
 }

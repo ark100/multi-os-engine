@@ -16,17 +16,19 @@ limitations under the License.
 
 package objc.tests;
 
-import mac.coregraphics.struct.CGRect;
+import apple.coregraphics.struct.CGRect;
 import org.junit.Assert;
 
 public abstract class NatJTest {
 
     static {
         // TODO: this is a workaround for compile issues produced by the need of static linking STL on Windows
-        if (!System.getProperty("os.name").startsWith("Windows")) {
-            System.loadLibrary("natj");
+        if (System.getProperty("moe.platform.name") == null) {
+            if (!System.getProperty("os.name").startsWith("Windows")) {
+                System.loadLibrary("natj");
+            }
+            System.loadLibrary("TestClassesObjC");
         }
-        System.loadLibrary("TestClassesObjC");
     }
 
     protected static final void assertArrayEquals(boolean[] expecteds, boolean[] actuals) {

@@ -29,13 +29,23 @@ dependencies {
 }
 
 tasks.withType(Test) {
-    systemProperty 'java.library.path', file('../natj-mac/build/xcode/Release')
+    def nativeConfiguration = 'Release'
+    dependsOn ":natj-mac:build_TestClassesC_${nativeConfiguration}_macosx"
+
+    systemProperty 'java.library.path', file("../natj-mac/build/xcode/${nativeConfiguration}")
     testLogging.showStandardStreams = true
+    if (rootProject.hasProperty("moe.use.addresssanitizer")) {
+        environment['DYLD_INSERT_LIBRARIES'] = '/Applications/Xcode.app/Contents/Developer/Toolchains/' +
+                'XcodeDefault.xctoolchain/usr/lib/clang/8.0.0/lib/darwin/libclang_rt.asan_osx_dynamic.dylib'
+        environment['ASAN_OPTIONS'] = 'handle_segv=0:allow_user_segv_handler=1'
+    }
 }
-tasks.test.dependsOn(':natj-mac:buildCTestNative')
 
 task ansibleTestWinPrepare(type: Tar) {
-    dependsOn tasks.getByPath(':natj-win:buildTestClassesC')
+    def nativeConfiguration = 'Release'
+    dependsOn ":natj-win:build_TestClassesC_${nativeConfiguration}_Win64"
+    // dependsOn ":natj-win:build_TestClassesC_${nativeConfiguration}_Win32"
+
     archiveName = "win-test.tar"
     into('classes') {
         from 'build/classes/test'
@@ -50,11 +60,11 @@ task ansibleTestWinPrepare(type: Tar) {
     }
     from '../gradlew.bat'
     into('natives') {
-        from '../natj-win/build/Release-Win64/TestClassesC.dll'
+        from "../natj-win/build/${nativeConfiguration}-Win64/TestClassesC.dll"
     }
-    into('natives32') {
-        from '../natj-win/build/Release-Win32/TestClassesC.dll'
-    }
+    // into('natives32') {
+    //     from "../natj-win/build/${nativeConfiguration}-Win32/TestClassesC.dll"
+    // }
     from '../build/libs/natj.jar'
 }
 

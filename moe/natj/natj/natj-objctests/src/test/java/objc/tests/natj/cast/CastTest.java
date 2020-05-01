@@ -22,13 +22,13 @@ import org.moe.natj.general.ptr.Ptr;
 import org.moe.natj.general.ptr.VoidPtr;
 import org.moe.natj.general.ptr.impl.PtrFactory;
 import org.moe.natj.objc.ObjCRuntime;
-import mac.corefoundation.c.CoreFoundation;
-import mac.corefoundation.enums.CFStringBuiltInEncodings;
-import mac.corefoundation.opaque.CFArrayRef;
-import mac.corefoundation.opaque.CFStringRef;
-import mac.corefoundation.struct.CFRange;
-import mac.foundation.NSArray;
-import mac.foundation.NSString;
+import apple.corefoundation.c.CoreFoundation;
+import apple.corefoundation.enums.CFStringBuiltInEncodings;
+import apple.corefoundation.opaque.CFArrayRef;
+import apple.corefoundation.opaque.CFStringRef;
+import apple.corefoundation.struct.CFRange;
+import apple.foundation.NSArray;
+import apple.foundation.NSString;
 import objc.binding.CustomizableDefaultClass;
 import org.junit.Assert;
 import org.junit.Test;
@@ -54,7 +54,7 @@ public class CastTest {
 
     @Test
     public void testCastIntegrityFromOpaquePtr() {
-        CFStringRef optr = CoreFoundation.CFStringCreateWithCString(null, "str", CFStringBuiltInEncodings.EncodingASCII);
+        CFStringRef optr = CoreFoundation.CFStringCreateWithCString(null, "str", CFStringBuiltInEncodings.ASCII);
 
         NSString obj = ObjCRuntime.cast(optr, NSString.class);
         Assert.assertEquals(obj.getPeerPointer(), optr.getPeer().getPeer());
