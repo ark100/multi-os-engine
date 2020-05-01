@@ -14,64 +14,283 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath "org.jfrog.buildinfo:build-info-extractor-gradle:4.11.0"
+    }
+}
+
 plugins {
     id "com.jfrog.bintray" version "1.7"
 }
 
 group 'org.multi-os-engine'
-version '1.0.0'
+version '1.4.2'
 
-apply plugin: 'java'
+apply plugin: 'base'
 apply plugin: 'maven-publish'
 
-sourceCompatibility = 1.8
-
-repositories {
-    mavenCentral()
+if (rootProject.hasProperty('artifactory.url')) {
+    apply plugin: "com.jfrog.artifactory"
 }
 
-dependencies {
-    testCompile group: 'junit', name: 'junit', version: '4.11'
+if (!rootProject.hasProperty('moe.tools.sdk.win_only')) {
+    tasks.build.dependsOn ':ext_natj_mac'
+    tasks.build.dependsOn ':prebuild_libimobiledevice_macos'
 }
 
-def moe_home = System.getenv('MOE_HOME_PATH')
-if (moe_home == null) {
-    throw new GradleException('Env var MOE_HOME_PATH is not set')
+if (!rootProject.hasProperty('moe.tools.sdk.mac_only')) {
+    tasks.build.dependsOn ':ext_natj_win'
+    tasks.build.dependsOn ':prebuild_libimobiledevice_windows'
 }
 
-task sdk(type: Zip) {
-    into('sdk') {
-        from files("$moe_home/sdk") {
-            include 'moe-core.jar'
-            include 'moe-ios-javadoc.jar'
-            include 'moe-ios-junit.jar'
-            include 'moe-ios.jar'
-            include 'iphoneos/MOE.framework/**/*'
-            include 'iphonesimulator/MOE.framework/**/*'
-        }
+def projectDeps = [
+        ':moe.binding.clang',
+        ':moe.binding.libimobiledevice',
+        ':moe.generator.natjgen',
+        ':moe.ios.device.launcher',
+        ':proguard',
+]
+
+projectDeps.each { evaluationDependsOn it }
+
+mkdir buildDir
+
+task buildDeps {
+    projectDeps.each { dependsOn project(it).tasks.build }
+}
+
+task processExtractiOS(type: Copy) {
+    dependsOn buildDeps
+    doFirst {
+        delete files("$buildDir/ios.srcs")
     }
-    into('tools') {
-        from files("$moe_home/tools") {
-            include 'dex2oat'
-            include 'dx'
-            include 'dx.jar'
-            include 'ios-device.jar'
-            include 'java8support.jar'
-            include 'macosx/x86_64/*.dylib'
-            include 'preloaded-classes'
-            include 'proguard-full.cfg'
-            include 'proguard.cfg'
-            include 'proguard.jar'
-            include 'retrolambda.jar'
-            include 'UITransformer-res/**/*'
-            include 'uiTransformer.jar'
-            include 'windows/x86_64/*.dll'
-            include 'wrapnatjgen.jar'
-        }
-        from files('.') {
-            include 'gradlew.zip'
-        }
+    from zipTree(rootProject.external.moe_core.out.moe_ios_jar)
+    into "$buildDir/ios.srcs"
+}
+
+task processRetroiOS(type: JavaExec) {
+    dependsOn processExtractiOS
+    doFirst {
+        delete files("$buildDir/ios.retro")
     }
+    systemProperties['retrolambda.inputDir'] = file("$buildDir/ios.srcs").absolutePath
+    systemProperties['retrolambda.classpath'] = rootProject.external.moe_core.out.moe_core_jar.absolutePath
+    systemProperties['retrolambda.defaultMethods'] = 'true'
+    systemProperties['retrolambda.outputDir'] = file("$buildDir/ios.retro").absolutePath
+    main '-jar'
+    args rootProject.external.moe_core.out.retrolambda_jar.absolutePath
+
+    inputs.dir(systemProperties['retrolambda.inputDir'])
+    inputs.file(systemProperties['retrolambda.classpath'])
+    inputs.property('retrolambda_defaultMethods', systemProperties['retrolambda.defaultMethods'])
+    outputs.dir(systemProperties['retrolambda.outputDir'])
+}
+
+task processJarRetroiOS(type: Jar) {
+    dependsOn processRetroiOS
+    from file("$buildDir/ios.retro")
+    archiveName 'moe-ios-retro.jar'
+}
+
+task processDexRetroiOS(type: Exec) {
+    dependsOn processJarRetroiOS
+
+    def cmd = ["--dex"]
+
+    cmd.add("--output")
+    def dexOutput = file("$buildDir/moe-ios-retro-dex.jar")
+    cmd.add(dexOutput.absolutePath)
+    ext.dexOutput = dexOutput
+    outputs.file(dexOutput)
+
+    cmd.add("--core-library")
+    cmd.add("--multi-dex")
+    def jarInput = processJarRetroiOS.archivePath
+    cmd.add(jarInput.absolutePath)
+    inputs.file(jarInput)
+
+    executable rootProject.external.moe_core.out.dx_exec
+    args cmd
+}
+
+task processDexCore(type: Exec) {
+    dependsOn buildDeps
+
+    def cmd = ["--dex"]
+
+    cmd.add("--output")
+    def dexOutput = file("$buildDir/moe-core.dex")
+    cmd.add(dexOutput.absolutePath)
+    ext.dexOutput = dexOutput
+    outputs.file(dexOutput)
+
+    cmd.add("--core-library")
+    def jarInput = rootProject.external.moe_core.out.moe_core_jar
+    cmd.add(jarInput.absolutePath)
+    inputs.file(jarInput)
+
+    executable rootProject.external.moe_core.out.dx_exec
+    args cmd
+}
+
+task processDexiOSJUnit(type: Exec) {
+    dependsOn buildDeps
+
+    def cmd = ["--dex"]
+
+    cmd.add("--output")
+    def dexOutput = file("$buildDir/moe-ios-junit.dex")
+    cmd.add(dexOutput.absolutePath)
+    ext.dexOutput = dexOutput
+    outputs.file(dexOutput)
+
+    cmd.add("--core-library")
+    def jarInput = rootProject.external.moe_core.out.moe_ios_junit_jar
+    cmd.add(jarInput.absolutePath)
+    inputs.file(jarInput)
+
+    executable rootProject.external.moe_core.out.dx_exec
+    args cmd
+}
+
+tasks.build {
+    dependsOn processJarRetroiOS
+    dependsOn processDexRetroiOS
+    dependsOn processDexCore
+    dependsOn processDexiOSJUnit
+}
+
+def buildfiles(def proj, def subpath, def closure) {
+    files("${project(proj).buildDir.absolutePath}/$subpath", closure)
+}
+
+def getSDKCopySpec() {
+    copySpec {
+        into('sdk') {
+            from files(rootProject.external.moe_core.out.moe_core_jar) {
+                rename rootProject.external.moe_core.out.moe_core_jar.name, 'moe-core.jar'
+            }
+            from files(rootProject.external.moe_core.out.moe_core_sources_jar) {
+                rename rootProject.external.moe_core.out.moe_core_sources_jar.name, 'moe-core-sources.jar'
+            }
+            from files(rootProject.external.moe_core.out.moe_core_javadoc_jar) {
+                rename rootProject.external.moe_core.out.moe_core_javadoc_jar.name, 'moe-core-javadoc.jar'
+            }
+            from files(rootProject.external.moe_core.out.moe_ios_jar) {
+                rename rootProject.external.moe_core.out.moe_ios_jar.name, 'moe-ios.jar'
+            }
+            from files(rootProject.external.moe_core.out.moe_ios_sources_jar) {
+                rename rootProject.external.moe_core.out.moe_ios_sources_jar.name, 'moe-ios-sources.jar'
+            }
+            from files(rootProject.external.moe_core.out.moe_ios_javadoc_jar) {
+                rename rootProject.external.moe_core.out.moe_ios_javadoc_jar.name, 'moe-ios-javadoc.jar'
+            }
+            from files(rootProject.external.moe_core.out.moe_ios_junit_jar) {
+                rename rootProject.external.moe_core.out.moe_ios_junit_jar.name, 'moe-ios-junit.jar'
+            }
+            from files(rootProject.external.moe_core.out.moe_ios_junit_sources_jar) {
+                rename rootProject.external.moe_core.out.moe_ios_junit_sources_jar.name, 'moe-ios-junit-sources.jar'
+            }
+            from files(rootProject.external.moe_core.out.moe_ios_junit_javadoc_jar) {
+                rename rootProject.external.moe_core.out.moe_ios_junit_javadoc_jar.name, 'moe-ios-junit-javadoc.jar'
+            }
+            from files(processDexCore.dexOutput) {
+                rename processDexCore.dexOutput.name, processDexCore.dexOutput.name
+            }
+            from files(processJarRetroiOS.archivePath) {
+                rename processJarRetroiOS.archivePath.name, processJarRetroiOS.archivePath.name
+            }
+            from files(processDexRetroiOS.dexOutput) {
+                rename processDexRetroiOS.dexOutput.name, processDexRetroiOS.dexOutput.name
+            }
+            from files(processDexiOSJUnit.dexOutput) {
+                rename processDexiOSJUnit.dexOutput.name, processDexiOSJUnit.dexOutput.name
+            }
+            from files(rootProject.external.moe_core.out.moe_core_certificates_zip) {
+                rename rootProject.external.moe_core.out.moe_core_certificates_zip.name, 'moe-core-certificates.zip'
+            }
+        }
+        into('sdk/iphoneos/MOE.framework') {
+            from files(rootProject.external.moe_core.out.iphoneos_MOE_framework)
+        }
+        into('sdk/iphonesimulator/MOE.framework') {
+            from files(rootProject.external.moe_core.out.iphonesimulator_MOE_framework)
+        }
+        into('tools') {
+            from files(rootProject.external.moe_core.out.dex2oat_exec.parentFile) {
+                include rootProject.external.moe_core.out.dex2oat_exec.name
+            }
+            from files(rootProject.external.moe_core.out.dx_exec.parentFile) {
+                include rootProject.external.moe_core.out.dx_exec.name
+            }
+            from files(rootProject.external.moe_core.out.dx_jar.parentFile) {
+                include rootProject.external.moe_core.out.dx_jar.name
+            }
+
+            from buildfiles(':moe.ios.device.launcher', 'libs') {
+                include 'moe.ios.device.launcher.jar'
+                rename 'moe.ios.device.launcher.jar', 'ios-device.jar'
+            }
+
+            from files(rootProject.external.moe_core.out.java8support_jar.parentFile) {
+                include rootProject.external.moe_core.out.java8support_jar.name
+                include rootProject.external.moe_core.out.proguard_full_cfg.name
+                include rootProject.external.moe_core.out.proguard_cfg.name
+                include rootProject.external.moe_core.out.retrolambda_jar.name
+                rename rootProject.external.moe_core.out.retrolambda_jar.name, 'retrolambda.jar'
+            }
+            from files(rootProject.external.moe_core.out.preloaded_classes.parentFile) {
+                include rootProject.external.moe_core.out.preloaded_classes.name
+            }
+
+            from buildfiles(':moe.generator.natjgen', 'libs') {
+                include 'moe.generator.natjgen.jar'
+                rename 'moe.generator.natjgen.jar', 'wrapnatjgen.jar'
+            }
+
+            from buildfiles(':proguard', 'libs') {
+                include 'proguard.jar'
+            }
+
+            from files('.') {
+                include 'gradlew.zip'
+            }
+        }
+
+        into('tools/macosx/x86_64') {
+            if (!rootProject.hasProperty('moe.tools.sdk.win_only')) {
+                from files(external.llvm.macos)
+                from files(external.libimobiledevice.macos)
+                from files(external.natj.mac)
+            } else {
+                from files('.placeholder')
+            }
+        }
+
+        into('tools/windows/x86_64') {
+            if (!rootProject.hasProperty('moe.tools.sdk.mac_only')) {
+                from files(external.libimobiledevice.windows)
+                from files(external.natj.win)
+            } else {
+                from files('.placeholder')
+            }
+        }
+
+        eachFile { println "${it}" }
+    }
+}
+
+task sdk(type: Zip, dependsOn: build) {
+    with getSDKCopySpec()
+}
+
+task devsdk(type: Copy, dependsOn: build) {
+    destinationDir = file("$buildDir/dev-sdk")
+    with getSDKCopySpec()
 }
 
 bintray {
@@ -102,11 +321,33 @@ bintray {
     }
 }
 
+if (rootProject.hasProperty('artifactory.url')) {
+    artifactory {
+        contextUrl = rootProject.getProperty('artifactory.url')
+        publish {
+            repository {
+                repoKey = rootProject.getProperty('artifactory.key')
+                username = rootProject.getProperty('artifactory.user')
+                password = rootProject.getProperty('artifactory.pass')
+            }
+            defaults {
+                publications('mavenJavaSnapshot')
+                publishArtifacts = true
+                publishPom = true
+                publishIvy = true
+            }
+        }
+    }
+}
+
 publishing {
     publications {
         mavenJava(MavenPublication) {
-            artifact sdk {
-            }
+            artifact sdk {}
+        }
+        mavenJavaSnapshot(MavenPublication) {
+            artifact sdk {}
+            version = "${project.version}-SNAPSHOT"
         }
     }
 }
