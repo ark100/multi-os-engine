@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2016 Migeran
+Copyright (C) 2017 Migeran
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,18 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package org.moe.gradle.groovy.closures;
+package org.moe;
 
-import groovy.lang.Closure;
-import org.gradle.api.Task;
-import org.moe.gradle.anns.NotNull;
-import org.moe.gradle.utils.Require;
+import org.moe.natj.general.Pointer;
+import org.moe.natj.general.ann.Owned;
+import org.moe.natj.objc.ann.ObjCClassName;
+import org.moe.natj.objc.ann.Selector;
 
-public abstract class SupplyingTaskClosure<T extends Task, R> extends Closure<R> {
+@ObjCClassName("InvalidController")
+public class InvalidController extends UnmappedController {
 
-    protected SupplyingTaskClosure(@NotNull Object owner) {
-        super(Require.nonNull(owner));
+    @Owned
+    @Selector("alloc")
+    public static native InvalidController alloc();
+
+    @Selector("init")
+    public native InvalidController init();
+
+    protected InvalidController(Pointer peer) {
+        super(peer);
     }
-
-    public abstract R doCall(T task);
 }

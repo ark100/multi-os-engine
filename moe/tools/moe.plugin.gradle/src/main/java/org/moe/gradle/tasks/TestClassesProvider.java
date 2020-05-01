@@ -18,8 +18,6 @@ package org.moe.gradle.tasks;
 
 import org.gradle.api.GradleException;
 import org.gradle.api.file.ConfigurableFileCollection;
-import org.gradle.api.file.FileVisitDetails;
-import org.gradle.api.file.FileVisitor;
 import org.gradle.api.tasks.InputFiles;
 import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.SourceSet;
@@ -36,8 +34,6 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -50,7 +46,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.jar.JarFile;
 
 public class TestClassesProvider extends AbstractBaseTask {
 
@@ -85,7 +80,6 @@ public class TestClassesProvider extends AbstractBaseTask {
         this.classListFile = classListFile;
     }
 
-
     @Override
     protected void run() {
         // Reset logs
@@ -95,58 +89,9 @@ public class TestClassesProvider extends AbstractBaseTask {
         // Create class map
         ClassMap classMap = new ClassMap();
 
-        getInputFiles().forEach(it -> {
-            FileUtils.append(getLogFile(), "Checking: " + it.getAbsolutePath() + "\n");
-            if (!it.exists()) {
-                return;
-            }
-
-            if (it.isDirectory()) {
-                getProject().fileTree(it).visit(new FileVisitor() {
-                    @Override
-                    public void visitDir(FileVisitDetails fileVisitDetails) {
-
-                    }
-
-                    @Override
-                    public void visitFile(FileVisitDetails fileVisitDetails) {
-                        File f = fileVisitDetails.getFile();
-                        if (!f.getName().endsWith(".class")) {
-                            return;
-                        }
-
-                        ClassTestAnnotationFinder indexer;
-                        try {
-                            indexer = new ClassTestAnnotationFinder(new FileInputStream(f));
-                        } catch (FileNotFoundException e) {
-                            throw new GradleException("failed to open file", e);
-                        }
-                        indexer.index(classMap);
-                    }
-                });
-            } else if (it.getName().endsWith(".jar")) {
-                JarFile file;
-                try {
-                    file = new JarFile(it);
-                } catch (IOException e) {
-                    throw new GradleException("an IOException occurred", e);
-                }
-                file.stream().forEach(entry -> {
-                    if (!entry.getName().endsWith(".class")) {
-                        return;
-                    }
-
-                    ClassTestAnnotationFinder indexer = null;
-                    try {
-                        indexer = new ClassTestAnnotationFinder(file.getInputStream(entry));
-                    } catch (IOException e) {
-                        throw new GradleException("an IOException occurred", e);
-                    }
-                    indexer.index(classMap);
-                });
-            } else {
-                getProject().getLogger().warn("Skipping test class check in " + it);
-            }
+        FileUtils.classAndJarInputIterator(getProject(), getInputFiles(), inputStream -> {
+            ClassTestAnnotationFinder indexer = new ClassTestAnnotationFinder(inputStream);
+            indexer.index(classMap);
         });
 
         classMap.resolve(getClassListFile());

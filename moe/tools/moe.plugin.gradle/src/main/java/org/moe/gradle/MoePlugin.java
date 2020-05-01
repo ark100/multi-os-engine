@@ -16,55 +16,57 @@ limitations under the License.
 
 package org.moe.gradle;
 
-import groovy.lang.GroovyObject;
-import org.apache.commons.lang3.text.WordUtils;
 import org.apache.tools.ant.taskdefs.condition.Os;
 import org.gradle.api.GradleException;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
-import org.gradle.api.internal.file.collections.SimpleFileCollection;
+import org.gradle.api.logging.Logger;
+import org.gradle.api.logging.Logging;
 import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.plugins.JavaPluginConvention;
-import org.gradle.api.tasks.SourceSet;
+import org.gradle.api.tasks.compile.CompileOptions;
+import org.gradle.api.tasks.compile.JavaCompile;
 import org.gradle.internal.reflect.Instantiator;
 import org.moe.gradle.anns.NotNull;
 import org.moe.gradle.anns.Nullable;
-import org.moe.gradle.groovy.closures.RuleClosure;
 import org.moe.gradle.remote.Server;
 import org.moe.gradle.tasks.AbstractBaseTask;
 import org.moe.gradle.tasks.Dex;
 import org.moe.gradle.tasks.Dex2Oat;
+import org.moe.gradle.tasks.GenerateUIObjCInterfaces;
 import org.moe.gradle.tasks.IpaBuild;
 import org.moe.gradle.tasks.Launchers;
+import org.moe.gradle.tasks.NatJGen;
 import org.moe.gradle.tasks.ProGuard;
 import org.moe.gradle.tasks.ResourcePackager;
 import org.moe.gradle.tasks.Retrolambda;
 import org.moe.gradle.tasks.StartupProvider;
 import org.moe.gradle.tasks.TestClassesProvider;
-import org.moe.gradle.tasks.UITransformer;
+import org.moe.gradle.tasks.UpdateXcodeSettings;
 import org.moe.gradle.tasks.XcodeBuild;
 import org.moe.gradle.tasks.XcodeInternal;
-import org.moe.gradle.tasks.XcodeProjectGenerator;
 import org.moe.gradle.tasks.XcodeProvider;
-import org.moe.gradle.utils.Arch;
-import org.moe.gradle.utils.Mode;
+import org.moe.gradle.utils.FileUtils;
 import org.moe.gradle.utils.Require;
-import org.moe.gradle.utils.StringUtils;
-import org.moe.gradle.utils.TaskUtils;
 
 import javax.inject.Inject;
 import java.io.File;
+import java.net.MalformedURLException;
 import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
-import static org.moe.gradle.MoePlugin.TaskParams.*;
+import static org.moe.gradle.AbstractMoePlugin.TaskParams.*;
 
+/**
+ * MOE's 'moe-gradle' plugin.
+ */
 public class MoePlugin extends AbstractMoePlugin {
+
+    private static final Logger LOG = Logging.getLogger(MoePlugin.class);
 
     @NotNull
     private MoeExtension extension;
@@ -72,14 +74,6 @@ public class MoePlugin extends AbstractMoePlugin {
     @NotNull
     public MoeExtension getExtension() {
         return Require.nonNull(extension, "The plugin's 'extension' property was null");
-    }
-
-    @NotNull
-    private JavaPluginConvention javaConvention;
-
-    @NotNull
-    public JavaPluginConvention getJavaConvention() {
-        return Require.nonNull(javaConvention, "The plugin's 'javaConvention' property was null");
     }
 
     @Nullable
@@ -113,53 +107,90 @@ public class MoePlugin extends AbstractMoePlugin {
         javaConvention = (JavaPluginConvention) project.getConvention().getPlugins().get("java");
         Require.nonNull(javaConvention, "The 'java' Gradle plugin must be applied before the '" + MOE + "' plugin");
 
+        // Add moe-core.jar to the bootclasspath
+        Arrays.asList("compileJava", "compileTestJava").forEach(name -> {
+            Task task = project.getTasks().getByName(name);
+            CompileOptions compileOptions = ((JavaCompile) task).getOptions();
+            compileOptions.setBootstrapClasspath(project.files(getSDK().getCoreJar()));
+            compileOptions.setFork(true);
+        });
+
         // Install core, ios and junit jars as dependencies
+        project.getRepositories().ivy(ivy -> {
+            ivy.setName("multi-os-engine-implicit-sdk-repo");
+            try {
+                ivy.setUrl(getSDK().getSDKDir().toURI().toURL());
+            } catch (MalformedURLException e) {
+                throw new GradleException("Failed to add Multi-OS Engine SDK repo", e);
+            }
+            ivy.artifactPattern(ivy.getUrl() + "/[artifact](-[classifier])(.[ext])");
+        });
+        project.getRepositories().ivy(ivy -> {
+            ivy.setName("multi-os-engine-implicit-tools-repo");
+            try {
+                ivy.setUrl(getSDK().getToolsDir().toURI().toURL());
+            } catch (MalformedURLException e) {
+                throw new GradleException("Failed to add Multi-OS Engine Tools repo", e);
+            }
+            ivy.artifactPattern(ivy.getUrl() + "/[artifact](-[classifier])(.[ext])");
+        });
+
         project.getDependencies().add(JavaPlugin.COMPILE_CONFIGURATION_NAME,
-                new SimpleFileCollection(getSDK().getCoreJar()));
+                FileUtils.getNameAsArtifact(getSDK().getCoreJar(), getSDK().sdkVersion));
+
         if (extension.getPlatformJar() != null) {
             project.getDependencies().add(JavaPlugin.COMPILE_CONFIGURATION_NAME,
-                    new SimpleFileCollection(extension.getPlatformJar()));
+                    FileUtils.getNameAsArtifact(getExtension().getPlatformJar(), getSDK().sdkVersion));
         }
         project.getDependencies().add(JavaPlugin.TEST_COMPILE_CONFIGURATION_NAME,
-                new SimpleFileCollection(getSDK().getJUnitJar()));
+                FileUtils.getNameAsArtifact(getSDK().getiOSJUnitJar(), getSDK().sdkVersion));
+
+        // Install java 8 support jars to fix lambda compilation
+        project.getDependencies().add(JavaPlugin.COMPILE_CONFIGURATION_NAME,
+                FileUtils.getNameAsArtifact(getSDK().getJava8SupportJar(), getSDK().sdkVersion));
+
+        project.getDependencies().add(JavaPlugin.TEST_COMPILE_CONFIGURATION_NAME,
+                FileUtils.getNameAsArtifact(getSDK().getJava8SupportJar(), getSDK().sdkVersion));        
 
         // Install rules
         addRule(ProGuard.class, "Creates a ProGuarded jar.",
-                singletonList(SOURCE_SET));
+                singletonList(SOURCE_SET), MoePlugin.this);
         addRule(Retrolambda.class, "Creates a Retrolambda-d jar.",
-                singletonList(SOURCE_SET));
+                singletonList(SOURCE_SET), MoePlugin.this);
         addRule(Dex.class, "Creates a Dexed jar.",
-                singletonList(SOURCE_SET));
+                singletonList(SOURCE_SET), MoePlugin.this);
         addRule(Dex2Oat.class, "Creates art and oat files.",
-                asList(SOURCE_SET, MODE, ARCH_FAMILY));
+                asList(SOURCE_SET, MODE, ARCH_FAMILY), MoePlugin.this);
         ResourcePackager.addRule(this);
         addRule(TestClassesProvider.class, "Creates the classlist.txt file.",
-                singletonList(SOURCE_SET));
+                singletonList(SOURCE_SET), MoePlugin.this);
         addRule(StartupProvider.class, "Creates the preregister.txt file.",
-                singletonList(SOURCE_SET));
-        addRule(UITransformer.class, "Runs the UITransformer.",
-                singletonList(SOURCE_SET));
-        addRule(XcodeProjectGenerator.class, "Creates an Xcode project.",
-                emptyList());
+                singletonList(SOURCE_SET), MoePlugin.this);
         addRule(XcodeProvider.class, "Collects the required dependencies.",
-                asList(SOURCE_SET, MODE, ARCH, PLATFORM));
+                asList(SOURCE_SET, MODE, ARCH, PLATFORM), MoePlugin.this);
         addRule(XcodeInternal.class, "Creates all files for Xcode.",
-                emptyList());
+                emptyList(), MoePlugin.this);
         addRule(XcodeBuild.class, "Creates .app files.",
-                asList(SOURCE_SET, MODE, PLATFORM));
+                asList(SOURCE_SET, MODE, PLATFORM), MoePlugin.this);
         addRule(IpaBuild.class, "Creates .ipa files.",
-                emptyList());
+                emptyList(), MoePlugin.this);
+        addRule(GenerateUIObjCInterfaces.class, "Creates a source file for Interface Builder",
+                emptyList(), MoePlugin.this);
+        addRule(NatJGen.class, "Generate binding",
+                emptyList(), MoePlugin.this);
+        addRule(UpdateXcodeSettings.class, "Updates Xcode project settings",
+                emptyList(), MoePlugin.this);
 
         project.getTasks().create("moeSDKProperties", task -> {
             task.setGroup(MOE);
             task.setDescription("Prints some properties of the MOE SDK.");
             task.getActions().add(t -> {
                 final File platformJar = extension.getPlatformJar();
-                System.out.println("\n" +
+                LOG.quiet("\n" +
                         "moe.sdk.home=" + getSDK().getRoot() + "\n" +
                         "moe.sdk.coreJar=" + getSDK().getCoreJar() + "\n" +
                         "moe.sdk.platformJar=" + (platformJar == null ? "" : platformJar) + "\n" +
-                        "moe.sdk.junitJar=" + getSDK().getJUnitJar() + "\n" +
+                        "moe.sdk.junitJar=" + getSDK().getiOSJUnitJar() + "\n" +
                         "\n");
             });
         });
@@ -167,10 +198,21 @@ public class MoePlugin extends AbstractMoePlugin {
             task.setGroup(MOE);
             task.setDescription("Prints some properties of the MOE Xcode project.");
             task.getActions().add(t -> {
-                final XcodeProjectGenerator generator = getTaskBy(XcodeProjectGenerator.class);
-                System.out.println("\n" +
-                        "moe.xcode.xcodeProjectPath=" + (new File(generator.getXcodeProjectDir(), generator.getProjectName() + ".xcodeproj")) + "\n" +
-                        "\n");
+                final StringBuilder b = new StringBuilder("\n");
+                Optional.ofNullable(extension.xcode.getProject()).ifPresent(
+                        o -> b.append("moe.xcode.project=").append(project.file(o).getAbsolutePath()).append("\n"));
+                Optional.ofNullable(extension.xcode.getWorkspace()).ifPresent(
+                        o -> b.append("moe.xcode.workspace=").append(project.file(o).getAbsolutePath()).append("\n"));
+                Optional.ofNullable(extension.xcode.getMainTarget()).ifPresent(
+                        o -> b.append("moe.xcode.mainTarget=").append(o).append("\n"));
+                Optional.ofNullable(extension.xcode.getTestTarget()).ifPresent(
+                        o -> b.append("moe.xcode.testTarget=").append(o).append("\n"));
+                Optional.ofNullable(extension.xcode.getMainScheme()).ifPresent(
+                        o -> b.append("moe.xcode.mainScheme=").append(o).append("\n"));
+                Optional.ofNullable(extension.xcode.getTestScheme()).ifPresent(
+                        o -> b.append("moe.xcode.testScheme=").append(o).append("\n"));
+                b.append("\n");
+                LOG.quiet(b.toString());
             });
         });
 
@@ -207,106 +249,10 @@ public class MoePlugin extends AbstractMoePlugin {
         }
     }
 
-    protected enum TaskParams {
-        SOURCE_SET, MODE, ARCH, ARCH_FAMILY, PLATFORM;
-
-        public Object getValue(MoePlugin plugin, String value) {
-            switch (this) {
-                case SOURCE_SET:
-                    return TaskUtils.getSourceSet(plugin, value);
-                case MODE:
-                    return Mode.getForName(value);
-                case ARCH:
-                    return Arch.getForName(value);
-                case ARCH_FAMILY:
-                    return Arch.validateArchFamily(value);
-                case PLATFORM:
-                    return MoePlatform.getForPlatformName(value);
-            }
-            throw new IllegalStateException();
+    @Override
+    protected void checkRemoteServer(AbstractBaseTask task) {
+        if (getRemoteServer() != null && task.getRemoteExecutionStatusSet()) {
+            task.dependsOn(getRemoteServer().getMoeRemoteServerSetupTask());
         }
-
-        public String getName() {
-            switch (this) {
-                case SOURCE_SET:
-                    return "SourceSet";
-                case MODE:
-                    return "Mode";
-                case ARCH:
-                    return "Architecture";
-                case ARCH_FAMILY:
-                    return "ArchitectureFamily";
-                case PLATFORM:
-                    return "Platform";
-            }
-            throw new IllegalStateException();
-        }
-
-        public static String getNameForValue(Object value) {
-            return WordUtils.capitalize(getNameForValueInternal(value));
-        }
-
-        public static String getNameForValueInternal(Object value) {
-            Require.nonNull(value);
-
-            if (value instanceof SourceSet) {
-                return ((SourceSet) value).getName();
-            } else if (value instanceof Mode) {
-                return ((Mode) value).name;
-            } else if (value instanceof Arch) {
-                return ((Arch) value).name;
-            } else if (value instanceof String) {
-                return Arch.validateArchFamily((String) value);
-            } else if (value instanceof MoePlatform) {
-                return ((MoePlatform) value).platformName;
-            } else
-                throw new IllegalStateException();
-        }
-    }
-
-    private <T extends AbstractBaseTask> void addRule(Class<T> taskClass, String description, List<TaskParams> params) {
-        // Prepare constants
-        final String TASK_NAME = taskClass.getSimpleName();
-        final String ELEMENTS_DESC = params.stream().map(p -> "<" + p.getName() + ">").collect(Collectors.joining());
-        final String PATTERN = MOE + ELEMENTS_DESC + TASK_NAME;
-
-        // Add rule
-        getProject().getTasks().addRule("Pattern: " + PATTERN + ": " + description, new RuleClosure(getProject()) {
-            @Override
-            public @Nullable Task doCall(@NotNull String taskName) {
-                Require.nonNull(taskName);
-                getLogger().info("Evaluating for " + TASK_NAME + " rule: " + taskName);
-
-                // Check for prefix, suffix and get elements in-between
-                List<String> elements = StringUtils.getElemsInRule(taskName, MOE, TASK_NAME);
-
-                // Prefix or suffix failed
-                if (elements == null) {
-                    return null;
-                }
-
-                // Check number of elements
-                TaskUtils.assertSize(elements, params.size(), ELEMENTS_DESC);
-
-                // Check element values & configure task on success
-                final AtomicInteger pIndex = new AtomicInteger();
-                final Object[] objects = params.stream().map(p -> p.getValue(MoePlugin.this, elements.get(pIndex.getAndIncrement()))).collect(Collectors.toList()).toArray();
-
-                // Create task
-                final T task = getProject().getTasks().create(taskName, taskClass);
-
-                // Set group
-                task.setGroup(MOE);
-
-                // Call setup method
-                ((GroovyObject) task).invokeMethod("setupMoeTask", objects);
-
-                if (getRemoteServer() != null && task.getRemoteExecutionStatusSet()) {
-                    task.dependsOn(getRemoteServer().getMoeRemoteServerSetupTask());
-                }
-
-                return task;
-            }
-        });
     }
 }

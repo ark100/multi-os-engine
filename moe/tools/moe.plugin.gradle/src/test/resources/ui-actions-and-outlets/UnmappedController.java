@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2016 Migeran
+Copyright (C) 2017 Migeran
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,4 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-rootProject.name = 'moe-gradle'
+package org.moe;
+
+import apple.uikit.UIViewController;
+import org.moe.natj.general.Pointer;
+import org.moe.natj.general.ann.Owned;
+import org.moe.natj.objc.ann.Selector;
+
+public class UnmappedController extends UIViewController {
+
+    @Owned
+    @Selector("alloc")
+    public static native UnmappedController alloc();
+
+    @Selector("init")
+    public native UnmappedController init();
+
+    protected UnmappedController(Pointer peer) {
+        super(peer);
+    }
+}

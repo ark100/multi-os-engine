@@ -14,10 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-plugins {
-    id "com.jfrog.bintray" version "1.7"
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath "org.jfrog.buildinfo:build-info-extractor-gradle:4.11.0"
+    }
 }
 
+plugins {
+    id "com.jfrog.bintray" version "1.8.4"
+}
+
+if (name != 'moe-gradle') {
+    throw new GradleException('Incorrect name')
+}
 group 'org.multi-os-engine'
 
 String loadPluginVersion() {
@@ -31,72 +43,43 @@ version loadPluginVersion()
 apply plugin: 'java'
 apply plugin: 'maven-publish'
 
-sourceCompatibility = 1.8
-
-repositories {
-    if (System.getenv('MOE_REPO') != null) {
-        maven { url(file(System.getenv('MOE_REPO')).toURI()) }
-    } else {
-        mavenLocal()
-    }
-    mavenCentral()
+if (rootProject.hasProperty('artifactory.url')) {
+    apply plugin: "com.jfrog.artifactory"
 }
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
 
 configurations {
     included
 }
 
-def includedDeps = [
-        dependencies.create('org.moe:moeCommonUtils:1.1.+'),
-        dependencies.create('org.moe:moeDocumentPbxproj:1.1.+'),
-        dependencies.create('org.moe:moeProjectGenerator:1.3.+'),
-]
-
-includedDeps.each {
-    configurations.included.dependencies.add(it)
-}
-
-def includedDepFiles = new HashSet()
-project.getRepositories().add(project.getRepositories().mavenLocal())
-includedDeps.collect() { dep ->
-    def files = configurations.included.files(dep)
-    files.findAll() { file -> includedDeps.find { d -> file.name.contains(d.name) } }.flatten().each() {
-        includedDepFiles.add(it)
-    }
-}
-
 dependencies {
     compile gradleApi()
 
-    compile group: 'org.apache.commons', name: 'commons-lang3', version: '3.3.2'
+    compile group: 'org.apache.commons', name: 'commons-lang3', version: '3.4'
     compile group: 'commons-io', name: 'commons-io', version: '2.4'
     compile group: 'com.jcraft', name: 'jsch', version: '0.1.53'
 
     compile group: 'org.ow2.asm', name: 'asm', version: '5.1'
     compile group: 'com.google.code.gson', name: 'gson', version: '2.7'
 
-    testCompile group: 'junit', name: 'junit', version: '4.11'
+    compile group: 'com.googlecode.plist', name: 'dd-plist', version: '1.19'
+
+    testCompile group: 'junit', name: 'junit', version: '4.12'
     testCompile gradleTestKit()
+    testCompile project(':moe.generator.project')
 
-    // Common Utils
-    compile 'org.slf4j:slf4j-api:1.7.7'
-    compile 'commons-io:commons-io:2.4'
-    compile 'com.jcraft:jsch:0.1.53'
-    compile 'com.jcraft:jzlib:1.1.3'
+    compileOnly project(':moe.tools.common')
+    compileOnly project(':moe.document.pbxproj')
+    compileOnly project(':moe.generator.project')
 
-    // Document pbxproj
-    compile 'commons-codec:commons-codec:1.9'
-
-    compile files(includedDepFiles)
+    included project(':moe.tools.common')
+    included project(':moe.document.pbxproj')
+    included project(':moe.generator.project')
 }
 
-def getRequiredEnv(name) {
-    String env = System.getenv(name)
-    if (env == null) {
-        throw new GradleException("Env $name is not set")
-    }
-    return env
-}
+tasks.test.dependsOn ':moe-sdk:devsdk'
 
 bintray {
     if (project.hasProperty('bintray.user')) {
@@ -111,9 +94,9 @@ bintray {
     pkg {
         repo = 'maven'
         name = 'moe-gradle'
-        userOrg = 'multi-os-engine'
-        websiteUrl = 'https://multi-os-engine.org'
-        vcsUrl = 'https://github.com/multi-os-engine/moe-plugin-gradle'
+        // userOrg = 'multi-os-engine'
+        websiteUrl = 'https://discuss.multi-os-engine.org'
+        vcsUrl = 'https://github.com/multi-os-engine-community/moe-plugin-gradle'
         licenses = ['Apache-2.0']
         labels = ['moe', 'multi-os-engine']
         publicDownloadNumbers = false
@@ -126,37 +109,58 @@ bintray {
     }
 }
 
-publishing {
-    if (System.getenv('PUBLISH_TARGET_REPO_ADDR') != null) {
-        repositories {
-            String mvnAddr = getRequiredEnv('PUBLISH_TARGET_REPO_ADDR')
-            String mvnUser = getRequiredEnv('PUBLISH_TARGET_REPO_USER')
-            String mvnPass = getRequiredEnv('PUBLISH_TARGET_REPO_PASS')
-            maven {
-                url mvnAddr
-                if (mvnUser.length() > 0) {
-                    credentials {
-                        username = mvnUser
-                        password = mvnPass
-                    }
-                }
+if (rootProject.hasProperty('artifactory.url')) {
+    artifactory {
+        contextUrl = rootProject.getProperty('artifactory.url')
+        publish {
+            repository {
+                repoKey = rootProject.getProperty('artifactory.key')
+                username = rootProject.getProperty('artifactory.user')
+                password = rootProject.getProperty('artifactory.pass')
+            }
+            defaults {
+                publications('mavenJavaSnapshot')
+                publishArtifacts = true
+                publishPom = true
+                publishIvy = true
             }
         }
     }
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+task sourceJar(type: Jar) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+publishing {
     publications {
         mavenJava(MavenPublication) {
             from components.java
+            artifact(javadocJar)
+            artifact(sourceJar)
             group project.group
             artifactId 'moe-gradle'
             version project.version
+        }
+        mavenJavaSnapshot(MavenPublication) {
+            from components.java
+            artifact(javadocJar)
+            artifact(sourceJar)
+            group project.group
+            artifactId 'moe-gradle'
+            version = "${project.version}-SNAPSHOT"
         }
     }
 }
 
 jar {
-    from includedDepFiles.collect() {
-        it.isDirectory() ? it : zipTree(it)
-    }
+    from { configurations.included.collect { it.isDirectory() ? it : zipTree(it) } }
 }
 
 // Write the plugin's classpath to a file to share with the tests
@@ -168,7 +172,9 @@ task createClasspathManifest {
 
     doLast {
         outputDir.mkdirs()
-        file("$outputDir/plugin-classpath.txt").text = sourceSets.main.runtimeClasspath.join("\n")
+        file("$outputDir/plugin-classpath.txt").text = (sourceSets.main.runtimeClasspath + configurations.included).join("\n")
+        file("$outputDir/plugin-sdk-localbuild.txt").text = project(':moe-sdk').file('build/dev-sdk')
+        file("$outputDir/plugin-version.txt").text = project.version
     }
 }
 

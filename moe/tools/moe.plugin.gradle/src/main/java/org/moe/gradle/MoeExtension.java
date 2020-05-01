@@ -23,15 +23,12 @@ import org.gradle.internal.reflect.Instantiator;
 import org.moe.gradle.anns.IgnoreUnused;
 import org.moe.gradle.anns.NotNull;
 import org.moe.gradle.anns.Nullable;
-import org.moe.gradle.options.IpaOptions;
-import org.moe.gradle.options.PackagingOptions;
-import org.moe.gradle.options.ResourceOptions;
-import org.moe.gradle.options.XcodeOptions;
+import org.moe.gradle.options.*;
 import org.moe.gradle.utils.Require;
 
 import java.io.File;
 
-public class MoeExtension {
+public class MoeExtension extends AbstractMoeExtension {
 
     private static final int PROGUARD_LEVEL_INVALID = -1;
     public static final int PROGUARD_LEVEL_APP = 0;
@@ -48,10 +45,7 @@ public class MoeExtension {
     private static final String MOE_PLATFORM_SKIP_PROPERTY = "moe.platform.skip";
 
     @NotNull
-    public final MoePlugin plugin;
-
-    @NotNull
-    public final PackagingOptions packagingOptions;
+    public final PackagingOptions packaging;
 
     @NotNull
     public final ResourceOptions resources;
@@ -60,10 +54,16 @@ public class MoeExtension {
     public final XcodeOptions xcode;
 
     @NotNull
-    public final IpaOptions ipaOptions;
+    public final SigningOptions signing;
 
-    @Nullable
-    public String mainClassName;
+    @NotNull
+    public final UIActionsAndOutletsOptions actionsAndOutlets;
+
+    @NotNull
+    public final IpaExportOptions ipaExport;
+
+    @NotNull
+    public final RemoteBuildOptions remoteBuildOptions;
 
     @NotNull
     private MoePlatform platform = MoePlatform.IOS;
@@ -72,12 +72,14 @@ public class MoeExtension {
     private int proguardLevelProperty = PROGUARD_LEVEL_INVALID;
 
     public MoeExtension(@NotNull MoePlugin plugin, @NotNull Instantiator instantiator) {
-        this.plugin = Require.nonNull(plugin);
-        Require.nonNull(instantiator);
-        this.packagingOptions = instantiator.newInstance(PackagingOptions.class);
+        super(plugin, instantiator);
+        this.packaging = instantiator.newInstance(PackagingOptions.class);
         this.resources = instantiator.newInstance(ResourceOptions.class);
-        this.xcode = instantiator.newInstance(XcodeOptions.class, plugin.getProject());
-        this.ipaOptions = instantiator.newInstance(IpaOptions.class);
+        this.xcode = instantiator.newInstance(XcodeOptions.class);
+        this.signing = instantiator.newInstance(SigningOptions.class);
+        this.actionsAndOutlets = instantiator.newInstance(UIActionsAndOutletsOptions.class);
+        this.ipaExport = instantiator.newInstance(IpaExportOptions.class);
+        this.remoteBuildOptions = instantiator.newInstance(RemoteBuildOptions.class);
     }
 
     void setup() {
@@ -106,8 +108,8 @@ public class MoeExtension {
     }
 
     @IgnoreUnused
-    public void packagingOptions(Action<PackagingOptions> action) {
-        Require.nonNull(action).execute(packagingOptions);
+    public void packaging(Action<PackagingOptions> action) {
+        Require.nonNull(action).execute(packaging);
     }
 
     @IgnoreUnused
@@ -121,21 +123,23 @@ public class MoeExtension {
     }
 
     @IgnoreUnused
-    public void ipaOptions(Action<IpaOptions> action) {
-        Require.nonNull(action).execute(ipaOptions);
+    public void signing(Action<SigningOptions> action) {
+        Require.nonNull(action).execute(signing);
     }
 
-    @NotNull
     @IgnoreUnused
-    // Add this variant of the method so we can access it from Gradle as 'sdk'
-    public MoeSDK getSdk() {
-        return plugin.getSDK();
+    public void actionsAndOutlets(Action<UIActionsAndOutletsOptions> action) {
+        Require.nonNull(action).execute(actionsAndOutlets);
     }
 
-    @NotNull
     @IgnoreUnused
-    public MoeSDK getSDK() {
-        return plugin.getSDK();
+    public void ipaExport(Action<IpaExportOptions> action) {
+        Require.nonNull(action).execute(ipaExport);
+    }
+
+    @IgnoreUnused
+    public void remoteBuild(Action<RemoteBuildOptions> action) {
+        Require.nonNull(action).execute(remoteBuildOptions);
     }
 
     @NotNull

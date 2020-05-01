@@ -16,22 +16,16 @@ limitations under the License.
 
 package org.moe.gradle.tasks;
 
-import org.apache.commons.io.IOUtils;
-import org.gradle.api.Action;
-import org.gradle.api.DefaultTask;
-import org.gradle.api.GradleException;
-import org.gradle.api.Project;
-import org.gradle.api.Rule;
-import org.gradle.api.Task;
+import org.gradle.api.*;
+import org.gradle.api.logging.Logger;
+import org.gradle.api.logging.Logging;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.TaskAction;
 import org.gradle.process.ExecResult;
 import org.gradle.process.ExecSpec;
 import org.gradle.process.JavaExecSpec;
-import org.moe.gradle.MoeExtension;
-import org.moe.gradle.MoePlugin;
-import org.moe.gradle.MoeSDK;
+import org.moe.gradle.*;
 import org.moe.gradle.anns.IgnoreUnused;
 import org.moe.gradle.anns.NotNull;
 import org.moe.gradle.anns.Nullable;
@@ -42,7 +36,6 @@ import org.moe.gradle.utils.FileUtils;
 import org.moe.gradle.utils.Require;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -57,8 +50,11 @@ public abstract class AbstractBaseTask extends DefaultTask {
 
     protected static final String CONVENTION_LOG_FILE = "logFile";
     private static final String CONVENTION_REMOTE_BUILD_HELPER = "remoteBuildHelper";
+    private static final String MOE_RAW_BINDING_OUTPUT_OPTION = "raw-binding-output";
 
     private Object logFile;
+
+    private final Logger logger = Logging.getLogger(getClass());
 
     @OutputFile
     @NotNull
@@ -76,6 +72,7 @@ public abstract class AbstractBaseTask extends DefaultTask {
     public boolean getRemoteExecutionStatusSet() {
         return Require.nonNull(remoteExecutionStatusSet);
     }
+
 
     @Input
     @NotNull
@@ -115,9 +112,13 @@ public abstract class AbstractBaseTask extends DefaultTask {
         return Require.nonNull((MoeExtension) getProject().getExtensions().findByName(MoePlugin.MOE));
     }
 
+    public @NotNull AbstractMoeExtension getExtension() {
+        return Require.nonNull((AbstractMoeExtension) getProject().getExtensions().findByName(AbstractMoePlugin.MOE));
+    }
+
     @NotNull
     protected MoePlugin getMoePlugin() {
-        return Require.nonNull(getMoeExtension().plugin);
+        return Require.nonNull((MoePlugin) getMoeExtension().plugin);
     }
 
     protected @NotNull MoeSDK getMoeSDK() {
@@ -180,7 +181,7 @@ public abstract class AbstractBaseTask extends DefaultTask {
     protected void exec(@NotNull Action<ExecSpec> spec) {
         Require.nonNull(spec);
 
-        FileUtils.append(getLogFile(), "");
+        FileUtils.createEmpty(getLogFile());
 
         final ExecResult result = getProject().exec(execSpec -> {
             // Pre-configure
@@ -199,15 +200,12 @@ public abstract class AbstractBaseTask extends DefaultTask {
             spec.execute(execSpec);
         });
         if (result.getExitValue() != 0 && shouldLogOnExecFail() && getLogFile() != null) {
-            System.err.print("\n" +
+            logger.error("\n" +
                     "###########\n" +
                     "# ERROR LOG\n" +
                     "###########\n\n");
-            try {
-                IOUtils.copy(new FileInputStream(getLogFile()), System.err);
-            } catch (IOException e) {
-                throw new GradleException("Failed to open input stream to " + getLogFile(), e);
-            }
+            logger.error(FileUtils.read(getLogFile()));
+            logger.error("\n");
         }
         if (result.getExitValue() != 0) {
             throw new GradleException("Task failed, you can find the log file here: " + getLogFile().getAbsolutePath());
@@ -217,9 +215,11 @@ public abstract class AbstractBaseTask extends DefaultTask {
     protected void javaexec(@NotNull Action<JavaExecSpec> spec) {
         Require.nonNull(spec);
 
-        FileUtils.append(getLogFile(), "");
+        FileUtils.createEmpty(getLogFile());
 
         final ExecResult result = getProject().javaexec(execSpec -> {
+            execSpec.jvmArgs(getExtension().javaProcess.getJvmArgs());
+
             spec.execute(execSpec);
 
             execSpec.setIgnoreExitValue(true);
@@ -230,19 +230,19 @@ public abstract class AbstractBaseTask extends DefaultTask {
             } catch (FileNotFoundException e) {
                 throw new GradleException("Failed to open output stream to " + getLogFile(), e);
             }
-            execSpec.setErrorOutput(ostream);
-            execSpec.setStandardOutput(ostream);
+
+            if (System.getProperty(MOE_RAW_BINDING_OUTPUT_OPTION) == null) {
+                execSpec.setErrorOutput(ostream);
+                execSpec.setStandardOutput(ostream);
+            }
         });
         if (result.getExitValue() != 0 && shouldLogOnExecFail() && getLogFile() != null) {
-            System.err.print("\n" +
+            logger.error("\n" +
                     "###########\n" +
                     "# ERROR LOG\n" +
                     "###########\n\n");
-            try {
-                IOUtils.copy(new FileInputStream(getLogFile()), System.err);
-            } catch (IOException e) {
-                throw new GradleException("Failed to open input stream to " + getLogFile(), e);
-            }
+            logger.error(FileUtils.read(getLogFile()));
+            logger.error("\n");
         }
         if (result.getExitValue() != 0) {
             throw new GradleException("Task failed, you can find the log file here: " + getLogFile().getAbsolutePath());
@@ -295,7 +295,8 @@ public abstract class AbstractBaseTask extends DefaultTask {
 
     protected Path getProjectRelativePath(@NotNull File file) {
         Require.nonNull(file);
-        return getProject().getProjectDir().toPath().relativize(file.toPath());
+        File projectDir = getProject().getParent() != null ? getProject().getParent().getProjectDir() : getProject().getProjectDir();
+        return projectDir.toPath().relativize(file.toPath());
     }
 
     protected Path getInnerProjectRelativePath(@NotNull File file) throws IOException {

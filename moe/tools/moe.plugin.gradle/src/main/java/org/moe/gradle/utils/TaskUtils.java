@@ -21,28 +21,30 @@ import org.gradle.api.Action;
 import org.gradle.api.GradleException;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
+import org.gradle.api.logging.Logger;
+import org.gradle.api.logging.Logging;
 import org.gradle.api.tasks.SourceSet;
 import org.gradle.process.ExecResult;
 import org.gradle.process.ExecSpec;
 import org.gradle.process.JavaExecSpec;
+import org.moe.gradle.AbstractMoePlugin;
 import org.moe.gradle.MoePlugin;
 import org.moe.gradle.anns.NotNull;
 import org.moe.gradle.anns.Nullable;
 import org.moe.gradle.groovy.closures.TaskClosure;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 public class TaskUtils {
-    private static final Logger LOG = LoggerFactory.getLogger(TaskUtils.class);
+
+    private static final Logger LOG = Logging.getLogger(TaskUtils.class);
 
     private TaskUtils() {
-
     }
 
     public static void assertSize(@NotNull List<String> elements, int count, @NotNull String desc) {
@@ -56,7 +58,7 @@ public class TaskUtils {
         }
     }
 
-    public static SourceSet getSourceSet(@NotNull MoePlugin plugin, @NotNull String sourceSetName) {
+    public static SourceSet getSourceSet(@NotNull AbstractMoePlugin plugin, @NotNull String sourceSetName) {
         Require.nonNull(plugin);
         Require.nonNull(sourceSetName);
 
@@ -114,8 +116,8 @@ public class TaskUtils {
             spec.setIgnoreExitValue(true);
             spec.setErrorOutput(out);
             spec.setStandardOutput(out);
-            cmds.addAll(spec.getCommandLine());
             javaExecSpec.execute(spec);
+            cmds.addAll(spec.getCommandLine());
         });
         if (result.getExitValue() != 0) {
             LOG.error("Command failed: " + cmds);
@@ -134,8 +136,8 @@ public class TaskUtils {
             spec.setIgnoreExitValue(true);
             spec.setErrorOutput(out);
             spec.setStandardOutput(out);
-            cmds.addAll(spec.getCommandLine());
             execSpec.execute(spec);
+            cmds.addAll(spec.getCommandLine());
         });
         if (result.getExitValue() != 0) {
             LOG.error("Command failed: " + cmds);
@@ -171,5 +173,9 @@ public class TaskUtils {
             spec.setStandardOutput(new NullOutputStream());
         });
         return result.getExitValue() == 0;
+    }
+
+    public static <T> T compute(@NotNull Supplier<T> supplier) {
+        return supplier.get();
     }
 }

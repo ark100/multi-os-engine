@@ -16,42 +16,45 @@ limitations under the License.
 
 package org.moe.gradle;
 
-import org.apache.tools.ant.taskdefs.condition.Os;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.gradle.api.GradleException;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.ExternalDependency;
+import org.gradle.api.artifacts.ResolvedArtifact;
 import org.gradle.api.artifacts.UnknownConfigurationException;
 import org.gradle.api.artifacts.repositories.ArtifactRepository;
+import org.gradle.api.logging.Logger;
+import org.gradle.api.logging.Logging;
+import org.gradle.api.plugins.ExtraPropertiesExtension;
 import org.moe.gradle.anns.IgnoreUnused;
 import org.moe.gradle.anns.NotNull;
 import org.moe.gradle.anns.Nullable;
 import org.moe.gradle.utils.FileUtils;
 import org.moe.gradle.utils.Require;
-import org.moe.gradle.utils.TaskUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
 
 public class MoeSDK {
-    private static final Logger LOG = LoggerFactory.getLogger(MoeSDK.class);
+    private static final Logger LOG = Logging.getLogger(MoeSDK.class);
 
+    private static final String MOE_GRADLE_ARTIFACT_ID = "moe-gradle";
     private static final String MOE_SDK_CONFIGURATION_NAME = "moeMavenSDK";
     private static final String MOE_LOCAL_SDK_PROPERTY = "moe.sdk.localbuild";
     private static final String MOE_LOCAL_SDK_ENV = "MOE_SDK_LOCALBUILD";
     private static final String MOE_GROUP_ID = "org.multi-os-engine";
     private static final String MOE_SDK_ARTIFACT_ID = "moe-sdk";
 
-    private static final Path USER_MOE_HOME;
+    public static final Path USER_MOE_HOME;
 
     static {
         final String user_moe_home = System.getenv("USER_MOE_HOME");
@@ -79,48 +82,91 @@ public class MoeSDK {
 
     public static MoeSDK setup(@NotNull AbstractMoePlugin plugin) {
         Require.nonNull(plugin);
-
-        final String pluginVersion;
-        final String sdkVersion;
-        {
-            // Get SDK version from moe.properties
-            final Properties props = new Properties();
-            try {
-                props.load(MoeSDK.class.getResourceAsStream("moe.properties"));
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-            pluginVersion = props.getProperty("MOE-Plugin-Version");
-            sdkVersion = props.getProperty("MOE-SDK-Version");
-        }
-        if (pluginVersion == null || pluginVersion.length() == 0) {
-            throw new GradleException("MOE SDK version is undefined");
-        }
-        if (sdkVersion == null || sdkVersion.length() == 0) {
-            throw new GradleException("MOE SDK version is undefined");
-        }
-
-        final MoeSDK sdk = new MoeSDK(pluginVersion, sdkVersion);
         final Project project = plugin.getProject();
+
+        Configuration classpathConfiguration =
+                project.getBuildscript().getConfigurations().getByName("classpath");
+        Require.nonNull(classpathConfiguration, "Couldn't find the classpath configuration in the buildscript.");
+
+        // Check if explicit SDK version is defined.
+        String sdkVersion = getMoeSDKVersion(project);
+        if (sdkVersion == null) {
+            // There's no explicit SDK version, retrieving version
+            // from moe.properties.
+            {
+                // Get SDK version from moe.properties
+                final Properties props = new Properties();
+                try {
+                    props.load(MoeSDK.class.getResourceAsStream("moe.properties"));
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+                sdkVersion = props.getProperty("MOE-SDK-Version");
+            }
+            if (sdkVersion == null || sdkVersion.length() == 0) {
+                throw new GradleException("MOE SDK version is undefined");
+            }
+
+            LOG.info("Using implicit moe-sdk version: {}", sdkVersion);
+        } else {
+            LOG.info("Using explicit moe-sdk version: {}", sdkVersion);
+        }
+
+        // Retrieve and resolve the moe-gradle plugin version.
+        ResolvedArtifact artifact;
+        {
+            Project classpathProject = project;
+            while ((artifact = classpathConfiguration.getResolvedConfiguration().getResolvedArtifacts()
+                    .stream()
+                    .filter(p -> MOE_GRADLE_ARTIFACT_ID.equals(p.getName()))
+                    .findAny()
+                    .orElse(null)) == null) {
+                classpathProject = classpathProject.getParent();
+                if (classpathProject == null) {
+                    break;
+                }
+                classpathConfiguration = classpathProject.getBuildscript().getConfigurations().getByName("classpath");
+                Require.nonNull(classpathConfiguration, "Couldn't find the classpath configuration in the buildscript.");
+            }
+        }
+        Require.nonNull(artifact, "Couldn't find the moe-gradle artifact.");
+        final String pluginVersion = artifact.getModuleVersion().getId().getVersion();
+        Require.nonNull(pluginVersion, "Couldn't resolve the version of the moe-gradle artifact.");
+        LOG.info("Resolved moe-gradle version: {}", pluginVersion);
 
         // Check for overriding property
         if (project.hasProperty(MOE_LOCAL_SDK_PROPERTY)) {
-            LOG.info("Using custom local MOE SDK");
             final Object property = project.property(MOE_LOCAL_SDK_PROPERTY);
             if (!(property instanceof String)) {
                 throw new GradleException("Value of " + MOE_LOCAL_SDK_PROPERTY + " property is not a String");
             }
-            final Path path = Paths.get((String) property);
-            sdk.validateCompleteSDK(path);
+            final Path path = Paths.get((String)property);
+            LOG.quiet("Using custom local MOE SDK: {}", path.toFile().getAbsolutePath());
+            // Construct the SDK.
+            final MoeSDK sdk = new MoeSDK(pluginVersion, sdkVersion);
+            sdk.validateSDK(path, true);
             sdk.bakeSDKPaths(path);
             return sdk;
         }
 
         // Check for overriding environment variable
         if (System.getenv(MOE_LOCAL_SDK_ENV) != null) {
-            LOG.info("Using custom local MOE SDK (env)");
             final Path path = Paths.get(System.getenv(MOE_LOCAL_SDK_ENV));
-            sdk.validateCompleteSDK(path);
+            LOG.quiet("Using custom local MOE SDK (env): {}", path.toFile().getAbsolutePath());
+            // Construct the SDK.
+            final MoeSDK sdk = new MoeSDK(pluginVersion, sdkVersion);
+            sdk.validateSDK(path, true);
+            sdk.bakeSDKPaths(path);
+            return sdk;
+        }
+
+        // Check if moe.sdk.localbuild file exists.
+        if (plugin.getProject().file("moe.sdk.localbuild").exists()) {
+            final Path path = Paths.get(FileUtils.read(plugin.getProject().file("moe.sdk.localbuild")).trim());
+            LOG.quiet("Using custom local MOE SDK (file): {}", path.toFile().getAbsolutePath());
+            // Construct the SDK.
+            final MoeSDK sdk = new MoeSDK(pluginVersion, sdkVersion);
+            sdk.validateSDK(path, true);
             sdk.bakeSDKPaths(path);
             return sdk;
         }
@@ -128,200 +174,151 @@ public class MoeSDK {
         // Use configuration
         LOG.info("Using Maven-based MOE SDK");
 
+        // We need a resolved SDK version which is required as a part of the SDK path.
+        sdkVersion = resolveSDKVersion(project, sdkVersion);
+        LOG.info("Resolved moe-sdk version: {}", sdkVersion);
+
+        // Construct the SDK.
+        final MoeSDK sdk = new MoeSDK(pluginVersion, sdkVersion);
+
         // Prepare USER_MOE_HOME
         if (!USER_MOE_HOME.toFile().exists() && !USER_MOE_HOME.toFile().mkdir()) {
             throw new GradleException("Failed to create directory at " + USER_MOE_HOME);
         }
 
-        // Check for pre-installed SDK
+        // If the required SDK version is already downloaded and not a snapshot (because snapshot versions
+        // can't be reused due to it's version can't be checked), use it and return.
+        final boolean isSnapshotSDKVersion = sdkVersion.endsWith("-SNAPSHOT");
         final Path SDK_PATH = USER_MOE_HOME.resolve("moe-sdk-" + sdkVersion);
-        if (SDK_PATH.toFile().exists()) {
-            sdk.validateCompleteSDK(SDK_PATH);
+        if (SDK_PATH.toFile().exists() && !isSnapshotSDKVersion) {
+            LOG.quiet("Using already downloaded SDK: {}", SDK_PATH.toFile().getAbsolutePath());
+            sdk.validateSDK(SDK_PATH, false);
             sdk.bakeSDKPaths(SDK_PATH);
             return sdk;
         }
 
-        // Prepare temp dir by removing old tmp directory and re-creating it
-        System.out.println("Installing MOE SDK, this may take a few minutes...");
-        final Path TEMP_SDK_PATH = USER_MOE_HOME.resolve("moe-sdk-" + sdkVersion + ".tmp");
-        if (TEMP_SDK_PATH.toFile().exists()) {
-            try {
-                FileUtils.deleteFileOrFolder(TEMP_SDK_PATH);
-            } catch (IOException e) {
-                throw new GradleException("Failed to delete directory " + TEMP_SDK_PATH, e);
+        // Download the SDK from the repositories.
+        final File file = sdk.downloadSDK(project, sdkVersion);
+
+        // Calculate MD5 on the SDK.
+        final AtomicReference<String> sdkCalculatedMD5Ref = new AtomicReference<>();
+        final boolean sdkUpToDate = checkComponentUpToDate(file, SDK_PATH.resolve("sdk.md5").toFile(), sdkCalculatedMD5Ref);
+        if (SDK_PATH.toFile().exists() && isSnapshotSDKVersion) {
+            if (sdkUpToDate) {
+                sdk.validateSDK(SDK_PATH, false);
+                sdk.bakeSDKPaths(SDK_PATH);
+                return sdk;
+            } else {
+                try {
+                    FileUtils.deleteFileOrFolder(SDK_PATH);
+                    LOG.info("Deleted existing SDK: {}", SDK_PATH.toFile().getAbsolutePath());
+                } catch (IOException e) {
+                    throw new GradleException("Failed to remote directory at " + SDK_PATH.toFile().getAbsolutePath(), e);
+                }
             }
         }
-        if (!TEMP_SDK_PATH.toFile().mkdir()) {
-            throw new GradleException("Failed to create directory at " + TEMP_SDK_PATH);
-        }
 
-        // Get or create configuration
-        final File file = sdk.downloadSDK(project, sdkVersion);
+        // Prepare temp dir by removing old tmp directory and re-creating it
+        LOG.quiet("Installing MOE SDK ({}), this may take a few minutes...", sdkVersion);
 
         // Extract zip into the temp directory
         project.copy(spec -> {
             spec.from(project.zipTree(file));
-            spec.into(TEMP_SDK_PATH.toFile());
+            spec.into(SDK_PATH.toFile());
         });
 
         // Validate files
-        sdk.validatePartialSDK(TEMP_SDK_PATH);
-
-        // Process SDK
-        sdk.completePartialSDK(project, TEMP_SDK_PATH);
-
-        // Move the SDK into place
-        if (!TEMP_SDK_PATH.toFile().renameTo(SDK_PATH.toFile())) {
-            throw new GradleException("Failed to move the MOE SDK into its final place");
-        }
+        sdk.validateSDK(SDK_PATH, false);
         sdk.bakeSDKPaths(SDK_PATH);
         return sdk;
     }
 
-    private void completePartialSDK(@NotNull Project project, @NotNull Path path) {
-        final ASync ios = new ASync(() -> {
-            LOG.info("Extracting retrolambda on moe-ios.jar");
-            project.copy(spec -> {
-                spec.from(project.zipTree(path.resolve("sdk/moe-ios.jar").toFile()));
-                spec.into(path.resolve("sdk/moe-ios-jar.dir").toFile());
-            });
-
-            LOG.info("Running retrolambda on moe-ios.jar");
-            TaskUtils.javaexec(project, spec -> {
-                spec.systemProperty("retrolambda.inputDir", path.resolve("sdk/moe-ios-jar.dir"));
-                spec.systemProperty("retrolambda.classpath", path.resolve("sdk/moe-core.jar"));
-                spec.systemProperty("retrolambda.defaultMethods", "true");
-                spec.systemProperty("retrolambda.outputDir", path.resolve("sdk/moe-ios-retro.dir"));
-                spec.setMain("-jar");
-                spec.args(path.resolve("tools/retrolambda.jar").toFile());
-            });
-
-            LOG.info("Creating moe-ios-retro.jar");
-            TaskUtils.exec(project, spec -> {
-                final Path wdir = path.resolve("sdk/moe-ios-retro.dir");
-                spec.setWorkingDir(wdir.toFile());
-                spec.setCommandLine("jar", "-cvf", path.resolve("sdk/moe-ios-retro.jar"), wdir.resolve("."));
-            });
-
-            LOG.info("Cleaning up temp files after moe-ios-retro.jar");
-            try {
-                FileUtils.deleteFileOrFolder(path.resolve("sdk/moe-ios-jar.dir"));
-            } catch (IOException ex) {
-                LOG.warn(ex.getMessage());
-            }
-            try {
-                FileUtils.deleteFileOrFolder(path.resolve("sdk/moe-ios-retro.dir"));
-            } catch (IOException ex) {
-                LOG.warn(ex.getMessage());
-            }
-
-            LOG.info("Created moe-ios-retro.jar");
-
-            LOG.info("Running dx on moe-ios-retro.jar");
-
-            final List<Object> cmd = new ArrayList<>();
-            cmd.add("--dex");
-            cmd.add("--output");
-            cmd.add(path.resolve("sdk/moe-ios-retro-dex.jar"));
-            cmd.add("--core-library");
-            cmd.add("--multi-dex");
-            cmd.add(path.resolve("sdk/moe-ios-retro.jar"));
-
-            if (Os.isFamily(Os.FAMILY_WINDOWS)) {
-                TaskUtils.javaexec(project, spec -> {
-                    spec.setMain("-jar");
-                    spec.args(path.resolve("tools/dx.jar").toFile());
-                    spec.args(cmd);
-                    System.out.println(spec.getCommandLine());
-                });
-            } else {
-                TaskUtils.exec(project, spec -> {
-                    spec.setExecutable(path.resolve("tools/dx").toFile());
-                    spec.args(cmd);
-                });
-            }
-
-            LOG.info("Created moe-ios-retro-dex.jar");
-        });
-
-        final ASync core = new ASync(() -> {
-            LOG.info("Running dx on moe-core.jar");
-
-            final List<Object> cmd = new ArrayList<>();
-            cmd.add("--dex");
-            cmd.add("--output");
-            cmd.add(path.resolve("sdk/moe-core.dex"));
-            cmd.add("--core-library");
-            cmd.add(path.resolve("sdk/moe-core.jar"));
-
-            if (Os.isFamily(Os.FAMILY_WINDOWS)) {
-                TaskUtils.javaexec(project, spec -> {
-                    spec.setMain("-jar");
-                    spec.args(path.resolve("tools/dx.jar").toFile());
-                    spec.args(cmd);
-                    System.out.println(spec.getCommandLine());
-                });
-            } else {
-                TaskUtils.exec(project, spec -> {
-                    spec.setExecutable(path.resolve("tools/dx").toFile());
-                    spec.args(cmd);
-                });
-            }
-
-            LOG.info("Created moe-core.dex");
-        });
-
-        final ASync junit = new ASync(() -> {
-            LOG.info("Running dx on moe-ios-junit.jar");
-
-            final List<Object> cmd = new ArrayList<>();
-            cmd.add("--dex");
-            cmd.add("--output");
-            cmd.add(path.resolve("sdk/moe-ios-junit.dex"));
-            cmd.add("--core-library");
-            cmd.add(path.resolve("sdk/moe-ios-junit.jar"));
-
-            if (Os.isFamily(Os.FAMILY_WINDOWS)) {
-                TaskUtils.javaexec(project, spec -> {
-                    spec.setMain("-jar");
-                    spec.args(path.resolve("tools/dx.jar").toFile());
-                    spec.args(cmd);
-                    System.out.println(spec.getCommandLine());
-                });
-            } else {
-                TaskUtils.exec(project, spec -> {
-                    spec.setExecutable(path.resolve("tools/dx").toFile());
-                    spec.args(cmd);
-                });
-            }
-
-            LOG.info("Created moe-ios-junit.dex");
-        });
-
-        // Wait for all tasks to complete
-        ios.join();
-        core.join();
-        junit.join();
-
-        validateCompleteSDK(path);
+    private static String getMoeSDKVersion(@NotNull Project project) {
+        final ExtraPropertiesExtension extraProperties = project.getExtensions().getExtraProperties();
+        if (!extraProperties.has("moeSDKVersion")) {
+            return null;
+        }
+        final Object moeSDKVersion = extraProperties.get("moeSDKVersion");
+        if (moeSDKVersion == null) {
+            throw new GradleException("'moeSDKVersion' property cannot be null");
+        }
+        if (!(moeSDKVersion instanceof String)) {
+            throw new GradleException("'moeSDKVersion' property must be a string");
+        }
+        if ("".equals((String) moeSDKVersion)) {
+            throw new GradleException("'moeSDKVersion' property must not be an empty string");
+        }
+        return (String)moeSDKVersion;
     }
 
-    private static class ASync {
-        @NotNull
-        final Thread worker;
+    private static boolean checkComponentUpToDate(File input, File md5file, AtomicReference<String> out) {
+        final String calculatedMD5;
+        try {
+            calculatedMD5 = DigestUtils.md5Hex(new FileInputStream(input)).trim();
+        } catch (IOException ignore) {
+            throw new GradleException(ignore.getMessage(), ignore);
+        }
+        out.set(calculatedMD5);
 
-        ASync(@NotNull Runnable task) {
-            worker = new Thread(Require.nonNull(task));
-            worker.start();
+        if (!md5file.exists()) {
+            return false;
+        }
+        final String cachedMD5 = FileUtils.read(md5file);
+        return cachedMD5.length() != 0 && cachedMD5.trim().equalsIgnoreCase(calculatedMD5);
+    }
+
+    private static <T> T createSDKArtifact(@NotNull Project project, String version, BiFunction<Configuration, ExternalDependency, T> consumer) {
+        Require.nonNull(project);
+        Require.nonNull(version);
+        final String desc = MOE_GROUP_ID + ":" + MOE_SDK_ARTIFACT_ID + ":" + version + "@zip";
+
+        // Get or create configuration
+        Configuration configuration;
+        ExternalDependency dependency;
+        try {
+            configuration = project.getConfigurations().getByName(MOE_SDK_CONFIGURATION_NAME);
+            Require.EQ(configuration.getDependencies().size(), 1,
+                    "Unexpected number of dependencies in moeSDK configuration.");
+            dependency = (ExternalDependency)configuration.getDependencies().iterator().next();
+        } catch (UnknownConfigurationException ex) {
+            configuration = project.getConfigurations().create(MOE_SDK_CONFIGURATION_NAME);
+            // Create an external dependency
+            dependency = (ExternalDependency)project.getDependencies().create(desc);
+            configuration.getDependencies().add(dependency);
         }
 
-        void join() {
-            try {
-                worker.join();
-            } catch (InterruptedException e) {
-                throw new GradleException("Failed to join worker thread", e);
+        // Add repositories from the buildscript to be able to download the SDK
+        Set<ArtifactRepository> addedRepositories = new HashSet<>();
+        project.getBuildscript().getRepositories().forEach(repository -> {
+            if (!project.getRepositories().contains(repository)) {
+                project.getRepositories().add(repository);
+                addedRepositories.add(repository);
             }
+        });
+        project.getRepositories().maven(repo -> {
+            repo.setUrl("https://dl.bintray.com/multi-os-engine/maven/");
+        });
+
+        try {
+            return consumer.apply(configuration, dependency);
+        } finally {
+            // Remove added repositories
+            project.getRepositories().removeAll(addedRepositories);
         }
+    }
+
+    private static String resolveSDKVersion(@NotNull Project project, String version) {
+        return createSDKArtifact(project, version, (config, dep) -> {
+            ResolvedArtifact artifact = config.getResolvedConfiguration().getResolvedArtifacts()
+                    .stream()
+                    .filter(p -> MOE_SDK_ARTIFACT_ID.equals(p.getName()))
+                    .findAny()
+                    .orElse(null);
+            Require.nonNull(artifact, "Couldn't find the " + MOE_SDK_ARTIFACT_ID + " artifact.");
+            final String sdkVersion = artifact.getModuleVersion().getId().getVersion();
+            Require.nonNull(sdkVersion, "Couldn't resolve the version of the " + MOE_SDK_ARTIFACT_ID + " artifact.");
+            return sdkVersion;
+        });
     }
 
     @NotNull
@@ -332,53 +329,41 @@ public class MoeSDK {
         final String desc = MOE_GROUP_ID + ":" + MOE_SDK_ARTIFACT_ID + ":" + version + "@zip";
         LOG.info("Downloading dependency " + desc);
 
-        // Get or create configuration
-        Configuration configuration;
-        try {
-            configuration = project.getConfigurations().getByName(MOE_SDK_CONFIGURATION_NAME);
-        } catch (UnknownConfigurationException ex) {
-            configuration = project.getConfigurations().create(MOE_SDK_CONFIGURATION_NAME);
-        }
-
-        // Create an external dependency
-        final ExternalDependency dependency = (ExternalDependency) project.getDependencies().create(desc);
-        configuration.getDependencies().add(dependency);
-
-        // Add repositories from buildscript to be able to download the SDK
-        Set<ArtifactRepository> addedRepositories = new HashSet<>();
-        project.getBuildscript().getRepositories().forEach(repository -> {
-            if (!project.getRepositories().contains(repository)) {
-                project.getRepositories().add(repository);
-                addedRepositories.add(repository);
-            }
+        final Set<File> files = createSDKArtifact(project, version, (config, dep) -> {
+            return config.files(dep);
         });
-
-        // Retrieve files
-        final Set<File> files;
-        try {
-            files = configuration.files(dependency);
-        } finally {
-            // Remove added repositories
-            project.getRepositories().removeAll(addedRepositories);
-        }
 
         // Return the SDK
         return Require.sizeEQ(files, 1, "Unexpected number of files in MOE SDK").iterator().next();
     }
 
-    private void validatePartialSDK(@NotNull Path path) {
+    private void validateSDK(@NotNull Path path, boolean isLocalSDK) {
         Require.nonNull(path);
 
         try {
             validate(DIR, path, "");
+            validate(FIL, path, "sdk/moe-core.dex");
             validate(FIL, path, "sdk/moe-core.jar");
-            validate(FIL, path, "sdk/moe-ios-javadoc.jar");
+            validate(FIL, path, "sdk/moe-core-javadoc.jar");
+            validate(FIL, path, "sdk/moe-core-sources.jar");
+            
+            validate(FIL, path, "sdk/moe-ios-junit.dex");
             validate(FIL, path, "sdk/moe-ios-junit.jar");
+            validate(FIL, path, "sdk/moe-ios-junit-javadoc.jar");
+            validate(FIL, path, "sdk/moe-ios-junit-sources.jar");
+
+            validate(FIL, path, "sdk/moe-ios-retro.jar");
+            validate(FIL, path, "sdk/moe-ios-retro-dex.jar");            
             validate(FIL, path, "sdk/moe-ios.jar");
-            validate(DIR, path, "sdk/iphoneos/MOE.framework");
-            validate(DIR, path, "sdk/iphonesimulator/MOE.framework");
+            validate(FIL, path, "sdk/moe-ios-javadoc.jar");
+            validate(FIL, path, "sdk/moe-ios-sources.jar");
+
+            if (!isLocalSDK) {
+                validate(DIR, path, "sdk/iphoneos/MOE.framework");
+                validate(DIR, path, "sdk/iphonesimulator/MOE.framework");
+            }
+
             validate(FIL | EXE, path, "tools/dex2oat");
-            validate(FIL | EXE, path, "tools/dx");
             validate(FIL, path, "tools/dx.jar");
             validate(FIL, path, "tools/ios-device.jar");
             validate(FIL, path, "tools/java8support.jar");
@@ -388,26 +373,9 @@ public class MoeSDK {
             validate(FIL, path, "tools/proguard.cfg");
             validate(FIL, path, "tools/proguard.jar");
             validate(FIL, path, "tools/retrolambda.jar");
-            validate(DIR, path, "tools/UITransformer-res");
-            validate(FIL, path, "tools/uiTransformer.jar");
             validate(DIR, path, "tools/windows/x86_64");
             validate(FIL, path, "tools/wrapnatjgen.jar");
             validate(FIL, path, "tools/gradlew.zip");
-        } catch (IOException ex) {
-            LOG.error("Error: failed to validate MOE SDK, " + ex.getMessage());
-            throw new GradleException("MOE SDK is probably damaged, please remove it manually from " + path);
-        }
-    }
-
-    private void validateCompleteSDK(@NotNull Path path) {
-        Require.nonNull(path);
-
-        validatePartialSDK(path);
-        try {
-            validate(FIL, path, "sdk/moe-core.dex");
-            validate(FIL, path, "sdk/moe-ios-junit.dex");
-            validate(FIL, path, "sdk/moe-ios-retro.jar");
-            validate(FIL, path, "sdk/moe-ios-retro-dex.jar");
         } catch (IOException ex) {
             LOG.error("Error: failed to validate MOE SDK, " + ex.getMessage());
             throw new GradleException("MOE SDK is probably damaged, please remove it manually from " + path);
@@ -438,15 +406,19 @@ public class MoeSDK {
     private @Nullable File MOE_SDK_SDK_DIR;
     private @Nullable File MOE_SDK_TOOLS_DIR;
     private @Nullable File MOE_SDK_CORE_JAR;
+    private @Nullable File MOE_SDK_CORE_SOURCES_JAR;
+    private @Nullable File MOE_SDK_CORE_JAVADOC_JAR;
     private @Nullable File MOE_SDK_CORE_DEX;
-    private @Nullable File MOE_SDK_JAVADOC_JAR;
-    private @Nullable File MOE_SDK_JUNIT_JAR;
-    private @Nullable File MOE_SDK_JUNIT_DEX;
+    private @Nullable File MOE_SDK_IOS_JAVADOC_JAR;
+    private @Nullable File MOE_SDK_IOS_JUNIT_JAR;
+    private @Nullable File MOE_SDK_IOS_JUNIT_SOURCES_JAR;
+    private @Nullable File MOE_SDK_IOS_JUNIT_JAVADOC_JAR;
+    private @Nullable File MOE_SDK_IOS_JUNIT_DEX;
     private @Nullable File MOE_SDK_IOS_JAR;
+    private @Nullable File MOE_SDK_IOS_SOURCES_JAR;
     private @Nullable File MOE_SDK_IOS_RETRO_JAR;
     private @Nullable File MOE_SDK_IOS_RETRO_DEX;
     private @Nullable File MOE_SDK_DEX2OAT_EXEC;
-    private @Nullable File MOE_SDK_DX_EXEC;
     private @Nullable File MOE_SDK_DX_JAR;
     private @Nullable File MOE_SDK_IOS_DEVICE_JAR;
     private @Nullable File MOE_SDK_JAVA8SUPPORT_JAR;
@@ -456,8 +428,6 @@ public class MoeSDK {
     private @Nullable File MOE_SDK_PROGUARD_CFG;
     private @Nullable File MOE_SDK_PROGUARD_JAR;
     private @Nullable File MOE_SDK_RETROLAMBDA_JAR;
-    private @Nullable File MOE_SDK_UITRANSFORMER_RES;
-    private @Nullable File MOE_SDK_UITRANSFORMER_JAR;
     private @Nullable File MOE_SDK_WINDOWS_X86_64_SUPPORT;
     private @Nullable File MOE_SDK_NATJGEN_JAR;
     private @Nullable File MOE_SDK_GRADLEW_ZIP;
@@ -468,14 +438,18 @@ public class MoeSDK {
         MOE_SDK_TOOLS_DIR = path.resolve("tools").toFile();
         MOE_SDK_CORE_JAR = path.resolve("sdk/moe-core.jar").toFile();
         MOE_SDK_CORE_DEX = path.resolve("sdk/moe-core.dex").toFile();
-        MOE_SDK_JAVADOC_JAR = path.resolve("sdk/moe-ios-javadoc.jar").toFile();
-        MOE_SDK_JUNIT_JAR = path.resolve("sdk/moe-ios-junit.jar").toFile();
-        MOE_SDK_JUNIT_DEX = path.resolve("sdk/moe-ios-junit.dex").toFile();
-        MOE_SDK_IOS_JAR = path.resolve("sdk/moe-ios.jar").toFile();
+        MOE_SDK_CORE_SOURCES_JAR = path.resolve("sdk/moe-core-sources.jar").toFile();
+        MOE_SDK_CORE_JAVADOC_JAR = path.resolve("sdk/moe-core-javadoc.jar").toFile();
         MOE_SDK_IOS_RETRO_JAR = path.resolve("sdk/moe-ios-retro.jar").toFile();
         MOE_SDK_IOS_RETRO_DEX = path.resolve("sdk/moe-ios-retro-dex.jar").toFile();
+        MOE_SDK_IOS_JAR = path.resolve("sdk/moe-ios.jar").toFile();
+        MOE_SDK_IOS_SOURCES_JAR = path.resolve("sdk/moe-ios-sources.jar").toFile();
+        MOE_SDK_IOS_JAVADOC_JAR = path.resolve("sdk/moe-ios-javadoc.jar").toFile();
+        MOE_SDK_IOS_JUNIT_JAR = path.resolve("sdk/moe-ios-junit.jar").toFile();
+        MOE_SDK_IOS_JUNIT_DEX = path.resolve("sdk/moe-ios-junit.dex").toFile();
+        MOE_SDK_IOS_JUNIT_SOURCES_JAR = path.resolve("sdk/moe-ios-junit-sources.jar").toFile();
+        MOE_SDK_IOS_JUNIT_JAVADOC_JAR = path.resolve("sdk/moe-ios-junit-javadoc.jar").toFile();        
         MOE_SDK_DEX2OAT_EXEC = path.resolve("tools/dex2oat").toFile();
-        MOE_SDK_DX_EXEC = path.resolve("tools/dx").toFile();
         MOE_SDK_DX_JAR = path.resolve("tools/dx.jar").toFile();
         MOE_SDK_IOS_DEVICE_JAR = path.resolve("tools/ios-device.jar").toFile();
         MOE_SDK_JAVA8SUPPORT_JAR = path.resolve("tools/java8support.jar").toFile();
@@ -485,8 +459,6 @@ public class MoeSDK {
         MOE_SDK_PROGUARD_CFG = path.resolve("tools/proguard.cfg").toFile();
         MOE_SDK_PROGUARD_JAR = path.resolve("tools/proguard.jar").toFile();
         MOE_SDK_RETROLAMBDA_JAR = path.resolve("tools/retrolambda.jar").toFile();
-        MOE_SDK_UITRANSFORMER_RES = path.resolve("tools/UITransformer-res").toFile();
-        MOE_SDK_UITRANSFORMER_JAR = path.resolve("tools/uiTransformer.jar").toFile();
         MOE_SDK_WINDOWS_X86_64_SUPPORT = path.resolve("tools/windows/x86_64").toFile();
         MOE_SDK_NATJGEN_JAR = path.resolve("tools/wrapnatjgen.jar").toFile();
         MOE_SDK_GRADLEW_ZIP = path.resolve("tools/gradlew.zip").toFile();
@@ -514,25 +486,55 @@ public class MoeSDK {
     }
 
     @NotNull
+    @IgnoreUnused
+    public File getCoreJavadocJar() {
+        return safeVariable(MOE_SDK_CORE_JAVADOC_JAR, "MOE_SDK_CORE_JAVADOC_JAR");
+    }
+
+    @NotNull
+    @IgnoreUnused
+    public File getCoreSourcesJar() {
+        return safeVariable(MOE_SDK_CORE_SOURCES_JAR, "MOE_SDK_CORE_SOURCES_JAR");
+    }
+
+    @NotNull
     public File getCoreDex() {
         return safeVariable(MOE_SDK_CORE_DEX, "MOE_SDK_CORE_DEX");
     }
 
     @NotNull
     @IgnoreUnused
-    public File getJavadocJar() {
-        return safeVariable(MOE_SDK_JAVADOC_JAR, "MOE_SDK_JAVADOC_JAR");
-    }
-
-    @NotNull
-    public File getJUnitJar() {
-        return safeVariable(MOE_SDK_JUNIT_JAR, "MOE_SDK_JUNIT_JAR");
+    public File getiOSJavadocJar() {
+        return safeVariable(MOE_SDK_IOS_JAVADOC_JAR, "MOE_SDK_IOS_JAVADOC_JAR");
     }
 
     @NotNull
     @IgnoreUnused
-    public File getJUnitDex() {
-        return safeVariable(MOE_SDK_JUNIT_DEX, "MOE_SDK_JUNIT_DEX");
+    public File getiOSSourcesJar() {
+        return safeVariable(MOE_SDK_IOS_SOURCES_JAR, "MOE_SDK_IOS_SOURCES_JAR");
+    }
+
+    @NotNull
+    public File getiOSJUnitJar() {
+        return safeVariable(MOE_SDK_IOS_JUNIT_JAR, "MOE_SDK_IOS_JUNIT_JAR");
+    }
+
+    @NotNull
+    @IgnoreUnused
+    public File getiOSJUnitJavadocJar() {
+        return safeVariable(MOE_SDK_IOS_JUNIT_JAVADOC_JAR, "MOE_SDK_IOS_JUNIT_JAVADOC_JAR");
+    }
+
+    @NotNull
+    @IgnoreUnused
+    public File getiOSJUnitSourcesJar() {
+        return safeVariable(MOE_SDK_IOS_JUNIT_SOURCES_JAR, "MOE_SDK_IOS_JUNIT_SOURCES_JAR");
+    }
+
+    @NotNull
+    @IgnoreUnused
+    public File getiOSJUnitDex() {
+        return safeVariable(MOE_SDK_IOS_JUNIT_DEX, "MOE_SDK_IOS_JUNIT_DEX");
     }
 
     @NotNull
@@ -554,11 +556,6 @@ public class MoeSDK {
     @NotNull
     public File getDex2OatExec() {
         return safeVariable(MOE_SDK_DEX2OAT_EXEC, "MOE_SDK_DEX2OAT_EXEC");
-    }
-
-    @NotNull
-    public File getDxExec() {
-        return safeVariable(MOE_SDK_DX_EXEC, "MOE_SDK_DX_EXEC");
     }
 
     @NotNull
@@ -605,16 +602,6 @@ public class MoeSDK {
     @NotNull
     public File getRetrolambdaJar() {
         return safeVariable(MOE_SDK_RETROLAMBDA_JAR, "MOE_SDK_RETROLAMBDA_JAR");
-    }
-
-    @NotNull
-    public File getUITransformerRes() {
-        return safeVariable(MOE_SDK_UITRANSFORMER_RES, "MOE_SDK_UITRANSFORMER_RES");
-    }
-
-    @NotNull
-    public File getUITransformerJar() {
-        return safeVariable(MOE_SDK_UITRANSFORMER_JAR, "MOE_SDK_UITRANSFORMER_JAR");
     }
 
     @NotNull
