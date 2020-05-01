@@ -29,7 +29,15 @@
 
 package org.moe.samples.taxi.ios;
 
+import apple.NSObject;
+import apple.corelocation.CLLocation;
+import apple.corelocation.struct.CLLocationCoordinate2D;
+import apple.uikit.*;
+import apple.uikit.enums.UIAlertActionStyle;
+import apple.uikit.enums.UIAlertControllerStyle;
+import apple.uikit.protocol.UITableViewDataSource;
 import org.moe.natj.general.Pointer;
+import org.moe.natj.general.ann.Owned;
 import org.moe.natj.general.ann.RegisterOnStartup;
 import org.moe.natj.objc.ObjCRuntime;
 import org.moe.natj.objc.ann.ObjCClassName;
@@ -38,24 +46,12 @@ import org.moe.natj.objc.ann.Selector;
 import org.moe.samples.taxi.common.TaxiRequest;
 import org.moe.samples.taxi.common.TaxiService;
 
-import ios.NSObject;
-import ios.corelocation.CLLocation;
-import ios.corelocation.struct.CLLocationCoordinate2D;
-import ios.uikit.UIAlertAction;
-import ios.uikit.UIAlertController;
-import ios.uikit.UIAlertView;
-import ios.uikit.UILabel;
-import ios.uikit.UIStoryboardSegue;
-import ios.uikit.UITableViewController;
-import ios.uikit.enums.UIAlertActionStyle;
-import ios.uikit.enums.UIAlertControllerStyle;
-import ios.uikit.protocol.UITableViewDataSource;
-
 @org.moe.natj.general.ann.Runtime(ObjCRuntime.class)
 @ObjCClassName("TableViewController")
 @RegisterOnStartup
 public class TableViewController extends UITableViewController implements UITableViewDataSource {
 
+    @Owned
     @Selector("alloc")
     public static native TableViewController alloc();
 
@@ -85,7 +81,6 @@ public class TableViewController extends UITableViewController implements UITabl
     @Selector("commentLabel")
     @Property
     public native UILabel getCommentLabel();
-
 
 
     @Override
@@ -163,7 +158,7 @@ public class TableViewController extends UITableViewController implements UITabl
         );
         if (TaxiService.instance().sendRequest(request)) {
             UIAlertView alert = UIAlertView.alloc().initWithTitleMessageDelegateCancelButtonTitleOtherButtonTitles(
-                    "Taxi", "You car is coming to you!", this, "OK", null
+                    "Taxi", "Your car is coming to you!", this, "OK", null
             );
             alert.show();
         }

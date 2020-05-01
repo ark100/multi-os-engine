@@ -34,26 +34,26 @@ import org.moe.samples.elements.common.ElementComparatorByAtomicNumber;
 import org.moe.samples.elements.common.ElementComparatorByState;
 import org.moe.samples.elements.common.ElementComparatorBySymbol;
 
-import com.longevitysoft.android.xml.plist.PListXMLHandler;
-import com.longevitysoft.android.xml.plist.PListXMLParser;
-import com.longevitysoft.android.xml.plist.domain.Array;
-import com.longevitysoft.android.xml.plist.domain.Dict;
-import com.longevitysoft.android.xml.plist.domain.PList;
+import org.longevitysoft.android.xml.plist.PListXMLHandler;
+import org.longevitysoft.android.xml.plist.PListXMLParser;
+import org.longevitysoft.android.xml.plist.domain.Array;
+import org.longevitysoft.android.xml.plist.domain.Dict;
+import org.longevitysoft.android.xml.plist.domain.PList;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import ios.coregraphics.c.CoreGraphics;
-import ios.coregraphics.struct.CGPoint;
-import ios.coregraphics.struct.CGRect;
-import ios.coregraphics.struct.CGSize;
-import ios.foundation.NSBundle;
-import ios.foundation.NSString;
-import ios.uikit.UIColor;
-import ios.uikit.UIFont;
-import ios.uikit.UIImage;
-import ios.uikit.c.UIKit;
+import apple.coregraphics.c.CoreGraphics;
+import apple.coregraphics.struct.CGPoint;
+import apple.coregraphics.struct.CGRect;
+import apple.coregraphics.struct.CGSize;
+import apple.foundation.NSBundle;
+import apple.foundation.NSString;
+import apple.uikit.UIColor;
+import apple.uikit.UIFont;
+import apple.uikit.UIImage;
+import apple.uikit.c.UIKit;
 
 public class PeriodicElements {
 

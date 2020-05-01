@@ -1,31 +1,58 @@
 buildscript {
     repositories {
-        mavenCentral()
-
-        maven {
-            url uri(System.getenv("MOE_HOME") + "/gradle")
-        }
+        jcenter()
+        mavenLocal()
     }
     dependencies {
-        classpath 'org.moe.gradle:moeGradlePlugin:1.1.+'
+        // Multi-OS Engine plugin
+        classpath group: 'org.multi-os-engine', name: 'moe-gradle', version: '1.5.+'
     }
 }
 
+// Apply plugins
+apply plugin: 'eclipse'
 apply plugin: 'moe'
 
-dependencies {
-    compile project(':common')
-    compile fileTree(dir: 'lib', include: '*.jar')
+// Set source and target to Java 8
+sourceCompatibility = "1.8"
+targetCompatibility = "1.8"
+
+// Set maven repository
+repositories {
+    jcenter()
 }
 
+// Exclude all files from Gradle's test runner
+test { exclude '**' }
+
+// Setup Multi-OS Engine
 moe {
     xcode {
-//        generateProject = false
+        project 'xcode/Taxi.xcodeproj'
         mainTarget 'Taxi'
-        bundleID 'org.moe.Taxi'
-        packageName 'org.moe.samples.taxi.ios'
-        appIconsSource 'AppIcon'
-        launchScreenFilePath 'src/main/resources/LaunchScreen.xib'
-        locationWhenInUseUsageDescription 'We do our best to preserve your battery life'
+        testTarget 'Taxi-Test'
+
+         workspace 'xcode/Taxi.xcworkspace'
+         mainScheme 'Taxi'
+         testScheme 'Taxi-Test'
+    }
+
+    natjgen {
+        config='pods.nbc'
+    }
+}
+
+dependencies {
+    // Compile with 'jar' files in the project's 'lib' directory
+    compile fileTree(dir: 'lib', include: '*.jar')
+
+    compile project(':common')
+}
+
+// Setup Eclipse
+eclipse {
+    // Set Multi-OS Engine nature
+    project {
+        natures 'org.multi-os-engine.project'
     }
 }

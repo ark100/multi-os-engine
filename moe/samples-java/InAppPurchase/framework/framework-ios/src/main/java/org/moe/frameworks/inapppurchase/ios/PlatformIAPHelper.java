@@ -35,36 +35,51 @@ import org.moe.frameworks.inapppurchase.ios.utils.SKProductDetails;
 import java.util.HashMap;
 import java.util.Map;
 
-import ios.foundation.NSArray;
-import ios.foundation.NSError;
-import ios.foundation.NSMutableSet;
-import ios.foundation.NSNotificationCenter;
-import ios.foundation.NSUserDefaults;
-import ios.storekit.SKPayment;
-import ios.storekit.SKPaymentQueue;
-import ios.storekit.SKPaymentTransaction;
-import ios.storekit.SKProduct;
-import ios.storekit.SKProductsRequest;
-import ios.storekit.SKProductsResponse;
-import ios.storekit.SKRequest;
-import ios.storekit.enums.Enums;
-import ios.storekit.enums.SKPaymentTransactionState;
-import ios.storekit.protocol.SKPaymentTransactionObserver;
-import ios.storekit.protocol.SKProductsRequestDelegate;
+import apple.foundation.NSArray;
+import apple.foundation.NSError;
+import apple.foundation.NSMutableSet;
+import apple.foundation.NSNotificationCenter;
+import apple.foundation.NSUserDefaults;
+import apple.storekit.SKPayment;
+import apple.storekit.SKPaymentQueue;
+import apple.storekit.SKPaymentTransaction;
+import apple.storekit.SKProduct;
+import apple.storekit.SKProductsRequest;
+import apple.storekit.SKProductsResponse;
+import apple.storekit.SKRequest;
+import apple.storekit.enums.SKErrorCode;
+import apple.storekit.enums.SKPaymentTransactionState;
+import apple.storekit.protocol.SKPaymentTransactionObserver;
+import apple.storekit.protocol.SKProductsRequestDelegate;
 
 public class PlatformIAPHelper extends AbstractIAPHelper implements SKProductsRequestDelegate, SKPaymentTransactionObserver {
+
     static {
         try {
+            // Fix NatJ runtime class initialization order for binding classes.
             Class.forName(SKProduct.class.getName());
+            Class.forName(SKPaymentTransaction.class.getName());
         } catch (ClassNotFoundException e) {
-            e.printStackTrace();
+            throw new RuntimeException(e);
         }
     }
 
     private SKProductsRequest productsRequest;
     private Map<String, SKProduct> nativeProductsMap = new HashMap<>();
 
+    // Force the Objective-C reference for this instance to be kept.
+    private NSArray selfReference = NSArray.arrayWithObject(this);
+
     public PlatformIAPHelper() {
+        this.setDebugHandler(new DebugHandler() {
+
+            @Override
+            public void callback(String component, String msg) {
+                System.out.println(component + ": " + msg);
+            }
+
+        });
+
         purchasedProductIdentifiers.clear();
 
         if (productIdentifiers != null) {
@@ -74,6 +89,7 @@ public class PlatformIAPHelper extends AbstractIAPHelper implements SKProductsRe
                 }
             }
         }
+        ((SKPaymentQueue) SKPaymentQueue.defaultQueue()).addTransactionObserver(this);
     }
 
     @Override
@@ -92,7 +108,11 @@ public class PlatformIAPHelper extends AbstractIAPHelper implements SKProductsRe
     }
 
     @Override
-    public void closeHelper() {}
+    public void closeHelper() {
+        // Remove forced strong Objective-C reference to this instance.
+        ((SKPaymentQueue) SKPaymentQueue.defaultQueue()).removeTransactionObserver(this);
+        selfReference.clear();
+    }
 
     @Override
     public void setDebugHandler(DebugHandler handler) {
@@ -145,7 +165,6 @@ public class PlatformIAPHelper extends AbstractIAPHelper implements SKProductsRe
 
     @Override
     public void productsRequestDidReceiveResponse(SKProductsRequest skProductsRequest, SKProductsResponse skProductsResponse) {
-        System.out.println();
         if (debugHandler != null) {
             debugHandler.callback("ios/PlatformIAPHelper [productsRequestDidReceiveResponse]",
                     "Loaded list of products...");
@@ -154,10 +173,11 @@ public class PlatformIAPHelper extends AbstractIAPHelper implements SKProductsRe
         SKProductDetails[] products = new SKProductDetails[nativeProducts.size()];
         nativeProductsMap.clear();
         for (int i = 0; i < nativeProducts.size(); i++) {
-            nativeProductsMap.put(nativeProducts.get(i).productIdentifier(), nativeProducts.get(i));
-            products[i] = new SKProductDetails(nativeProducts.get(i).productIdentifier(),
-                    nativeProducts.get(i).price(), nativeProducts.get(i).localizedTitle(),
-                    nativeProducts.get(i).localizedDescription());
+            SKProduct skProduct = nativeProducts.get(i);
+            nativeProductsMap.put(skProduct.productIdentifier(), skProduct);
+            products[i] = new SKProductDetails(skProduct.productIdentifier(),
+                    skProduct.price(), skProduct.localizedTitle(),
+                    skProduct.localizedDescription());
         }
 
         if (completionHandler != null)
@@ -224,7 +244,7 @@ public class PlatformIAPHelper extends AbstractIAPHelper implements SKProductsRe
     }
 
     private void failedTransaction(SKPaymentTransaction transaction) {
-        if (transaction.error().code() != Enums.SKErrorPaymentCancelled) {
+        if (transaction.error().code() != SKErrorCode.PaymentCancelled) {
             if (errorHandler != null) {
                 errorHandler.callback("ios/PlatformIAPHelper [requestDidFailWithError]",
                         "Transaction error: " + transaction.error().localizedDescription());

@@ -29,10 +29,12 @@
 
 package org.moe.samples.taxi.ios;
 
-import ios.corelocation.CLLocation;
+import apple.corelocation.CLLocation;
 
 public interface LocationManagerDelegate {
     void didUpdateLocation(LocationManager manager, CLLocation location);
+
     void didUpdateState(LocationManager manager, LocationManager.State state);
+
     void didUpdateTrackingLocation(LocationManager manager, CLLocation location);
 }

@@ -29,15 +29,17 @@
 
 package org.moe.samples.taxi.ios;
 
-import ios.NSObject;
-import ios.foundation.NSDictionary;
-import ios.uikit.UIApplication;
-import ios.uikit.UIWindow;
-import ios.uikit.c.UIKit;
-import ios.uikit.protocol.UIApplicationDelegate;
+import apple.NSObject;
+import apple.foundation.NSDictionary;
+import apple.uikit.UIApplication;
+import apple.uikit.UIWindow;
+import apple.uikit.c.UIKit;
+import apple.uikit.protocol.UIApplicationDelegate;
 
+import org.moe.GCUtil;
 import org.moe.googlemaps.GMSServices;
 import org.moe.natj.general.Pointer;
+import org.moe.natj.general.ann.Owned;
 import org.moe.natj.general.ann.RegisterOnStartup;
 import org.moe.natj.objc.ann.Selector;
 
@@ -48,6 +50,7 @@ public class Main extends NSObject implements UIApplicationDelegate {
         UIKit.UIApplicationMain(0, null, null, Main.class.getName());
     }
 
+    @Owned
     @Selector("alloc")
     public static native Main alloc();
 
@@ -58,10 +61,10 @@ public class Main extends NSObject implements UIApplicationDelegate {
     private UIWindow window;
 
     @Override
-    public boolean applicationDidFinishLaunchingWithOptions(UIApplication application, NSDictionary launchOptions)
-    {
+    public boolean applicationDidFinishLaunchingWithOptions(UIApplication application, NSDictionary launchOptions) {
+        GCUtil.register();
         System.out.println("Google Maps SDK Version: " + GMSServices.SDKVersion().toString());
-        String key = "AIzaSyAod4DhhPtB-llKir5eJMYnpBxJocNQf_I";
+        String key = "AIzaSyDBNHlacyZBHNJVbjv90p7vVE0VnflUTIE";
         boolean result = GMSServices.provideAPIKey(key);
         System.out.println("provideAPIKey result: " + (result ? "YES" : "NO"));
 

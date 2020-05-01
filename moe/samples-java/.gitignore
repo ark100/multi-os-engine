@@ -15,3 +15,15 @@ build/
 local.properties
 gradle.properties
 build-xcode/
+moe.sdk.localbuild
+.classpath
+.project
+.settings
+bin
+Taxi/ios/xcode/Pods
+Podfile.lock
+Taxi/ios/src/main/java/org/moe/googlemaps
+Taxi/ios/src/main/java/org/moe/googlemapsbase
+LibGDXMissileCommand/ios/xcode/native
+versions.json
+LibGDXMissileCommand/app/libs

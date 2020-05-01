@@ -29,12 +29,12 @@
 
 package org.moe.samples.currencyconverter.ios;
 
-import ios.NSObject;
-import ios.foundation.NSDictionary;
-import ios.uikit.UIApplication;
-import ios.uikit.UIWindow;
-import ios.uikit.c.UIKit;
-import ios.uikit.protocol.UIApplicationDelegate;
+import apple.NSObject;
+import apple.foundation.NSDictionary;
+import apple.uikit.UIApplication;
+import apple.uikit.UIWindow;
+import apple.uikit.c.UIKit;
+import apple.uikit.protocol.UIApplicationDelegate;
 
 import org.moe.natj.general.Pointer;
 import org.moe.natj.general.ann.RegisterOnStartup;
@@ -58,11 +58,6 @@ public class Main extends NSObject implements UIApplicationDelegate {
 
     @Override
     public boolean applicationDidFinishLaunchingWithOptions(UIApplication application, NSDictionary launchOptions) {
-        // For set proxy
-        //System.setProperty("http.proxyHost", "proxy_address");
-        //System.setProperty("http.proxyPort", "proxy_port");
-        //System.setProperty("https.proxyHost", "proxy_address");
-        //System.setProperty("https.proxyPort", "proxy_port");
         return true;
     }
 

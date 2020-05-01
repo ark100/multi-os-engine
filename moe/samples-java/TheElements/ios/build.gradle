@@ -1,27 +1,50 @@
 buildscript {
     repositories {
-        mavenCentral()
         jcenter()
-
-        maven {
-            url uri(System.getenv("MOE_HOME") + "/gradle")
-        }
+        mavenLocal()
     }
     dependencies {
-        classpath 'org.moe.gradle:moeGradlePlugin:1.1.+'
+        // Multi-OS Engine plugin
+        classpath group: 'org.multi-os-engine', name: 'moe-gradle', version: '1.5.+'
     }
 }
 
+// Apply plugins
+apply plugin: 'eclipse'
 apply plugin: 'moe'
 
+// Set source and target to Java 8
+sourceCompatibility = "1.8"
+targetCompatibility = "1.8"
+
+// Set maven repository
+repositories {
+    jcenter()
+}
+
+// Exclude all files from Gradle's test runner
+test { exclude '**' }
+
+// Setup Multi-OS Engine
+moe {
+    xcode {
+        project 'xcode/TheElements.xcodeproj'
+        mainTarget 'TheElements'
+        testTarget 'TheElements-Test'
+    }
+}
+
 dependencies {
+    // Compile with 'jar' files in the project's 'lib' directory
     compile fileTree(dir: 'lib', include: '*.jar')
+
     compile project(':common')
 }
 
-moe {
-    xcode {
-        mainTarget 'TheElements'
-        packageName 'org.moe.samples.elements.ios'
+// Setup Eclipse
+eclipse {
+    // Set Multi-OS Engine nature
+    project {
+        natures 'org.multi-os-engine.project'
     }
 }

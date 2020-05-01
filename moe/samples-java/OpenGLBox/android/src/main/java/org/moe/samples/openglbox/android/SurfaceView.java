@@ -35,9 +35,12 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.opengl.GLSurfaceView;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 
 import org.moe.samples.openglbox.android.R;
+
+import java.io.IOException;
 
 class SurfaceView extends GLSurfaceView {
 
@@ -64,15 +67,14 @@ class SurfaceView extends GLSurfaceView {
         // Set the Renderer for drawing on the GLSurfaceView
         setRenderer(renderer);
 
-        Resources resources = context.getResources();
-
-        final BitmapFactory.Options options = new BitmapFactory.Options();
-        options.inScaled = false;   // No pre-scaling
-
         // Read in the resource
-        final Bitmap bitmap = BitmapFactory.decodeResource(resources, R.drawable.moe_logo_square, options);
-
-        renderer.setBitmap(bitmap);
+        final Bitmap bitmap;
+        try {
+            bitmap = BitmapFactory.decodeStream(context.getAssets().open("moe_logo_square.png"));
+            renderer.setBitmap(bitmap);
+        } catch (IOException e) {
+            Log.e("SurfaceView", "Unable find image", e);
+        }
     }
 
     @Override

@@ -29,29 +29,26 @@
 
 package org.moe.samples.taxi.ios;
 
+import apple.NSObject;
+import apple.corelocation.CLLocation;
+import apple.corelocation.struct.CLLocationCoordinate2D;
+import apple.uikit.UIImage;
+import apple.uikit.UISearchBar;
+import apple.uikit.UIViewController;
+import apple.uikit.enums.UISearchBarStyle;
+import apple.uikit.protocol.UISearchBarDelegate;
+
+import org.moe.GCUtil;
+import org.moe.googlemaps.*;
+import org.moe.googlemaps.protocol.GMSMapViewDelegate;
 import org.moe.natj.general.Pointer;
+import org.moe.natj.general.ann.Owned;
 import org.moe.natj.general.ann.RegisterOnStartup;
 import org.moe.natj.objc.ObjCRuntime;
 import org.moe.natj.objc.ann.ObjCClassName;
 import org.moe.natj.objc.ann.Property;
 import org.moe.natj.objc.ann.Selector;
-
-import org.moe.googlemaps.GMSAddress;
-import org.moe.googlemaps.GMSGeocoder;
-import org.moe.googlemaps.GMSCameraPosition;
-import org.moe.googlemaps.GMSMapView;
-import org.moe.googlemaps.GMSMarker;
-import org.moe.googlemaps.protocol.GMSMapViewDelegate;
 import org.moe.samples.taxi.common.Parameters;
-
-import ios.NSObject;
-import ios.corelocation.CLLocation;
-import ios.corelocation.struct.CLLocationCoordinate2D;
-import ios.uikit.UIImage;
-import ios.uikit.UISearchBar;
-import ios.uikit.UIViewController;
-import ios.uikit.enums.UISearchBarStyle;
-import ios.uikit.protocol.UISearchBarDelegate;
 
 @org.moe.natj.general.ann.Runtime(ObjCRuntime.class)
 @ObjCClassName("MapsViewController")
@@ -67,11 +64,15 @@ public class MapsViewController extends UIViewController implements GMSMapViewDe
     private boolean located = false;
     private CLLocationCoordinate2D selectedCoordinate;
     private String address = "";
+    private UIImage image;
+    private GMSMarker marker;
+    private GMSCameraPosition camera;
 
     protected MapsViewController(Pointer peer) {
         super(peer);
     }
 
+    @Owned
     @Selector("alloc")
     public static native MapsViewController alloc();
 
@@ -86,22 +87,22 @@ public class MapsViewController extends UIViewController implements GMSMapViewDe
     @Property
     public native UISearchBar getSearchBar();
 
-    private GMSMarker marker;
-
     @Override
     public void viewDidLoad() {
-        GMSCameraPosition camera = (GMSCameraPosition) GMSCameraPosition.cameraWithTargetZoom(selectedCoordinate, Parameters.defaultZoom);
+        camera = (GMSCameraPosition) GMSCameraPosition.cameraWithTargetZoom(selectedCoordinate, Parameters.defaultZoom);
+
+        image = UIImage.alloc().init();
+        marker = GMSMarker.alloc().init();
 
         getMapView().setCamera(camera);
         getMapView().settings().setCompassButton(true);
 
         // Creates a marker with current location
-        marker = GMSMarker.alloc().init();
         marker.setTitle("My location");
         marker.setSnippet("Russia");
         marker.setMap(getMapView());
 
-        getSearchBar().setBackgroundImage(UIImage.alloc().init());
+        getSearchBar().setBackgroundImage(image);
         getSearchBar().setSearchBarStyle(UISearchBarStyle.Default);
 
         getSearchBar().setDelegate(this);
@@ -117,10 +118,30 @@ public class MapsViewController extends UIViewController implements GMSMapViewDe
 
     @Override
     public void searchBarSearchButtonClicked(UISearchBar searchBar) {
-        getSearchBar().resignFirstResponder() ;
+        getSearchBar().resignFirstResponder();
 
         // Do the search...
         System.out.println("--- searchBar.text: " + getSearchBar().text());
+    }
+
+    @Override
+    public void viewWillDisappear(boolean animated) {
+        super.viewWillDisappear(animated);
+        marker.setMap(null);
+        getSearchBar().setDelegate(null);
+        getSearchBar().setBackgroundImage(null);
+        LocationManager.getSharedManager().setDelegate(null);
+        getMapView().setDelegate(null);
+        getMapView().setCamera(null);
+        getMapView().clear();
+
+        image = null;
+        marker = null;
+        handler = null;
+        selectedCoordinate = null;
+        camera = null;
+
+        GCUtil.gc();
     }
 
     @Override
@@ -143,6 +164,11 @@ public class MapsViewController extends UIViewController implements GMSMapViewDe
             CLLocationCoordinate2D coordinate = location.coordinate();
             GMSCameraPosition camera = (GMSCameraPosition) GMSCameraPosition.cameraWithTargetZoom(coordinate, Parameters.defaultZoom);
             getMapView().animateToCameraPosition(camera);
+
+            location = null;
+            coordinate = null;
+            camera = null;
+            GCUtil.gc();
         } else {
             System.out.println(LocationManager.LOCATION_WARNING);
         }

@@ -1,14 +1,10 @@
 buildscript {
     repositories {
-        mavenCentral()
         jcenter()
-
-        maven {
-            url uri(System.getenv("MOE_HOME") + "/gradle")
-        }
+        mavenLocal()
     }
     dependencies {
-        classpath 'org.moe.gradle:moeGradlePlugin:1.1.+'
+        classpath group: 'org.multi-os-engine', name: 'moe-gradle', version: '1.5.+'
     }
 }
 
@@ -16,18 +12,22 @@ apply plugin: 'moe'
 
 dependencies {
     compile fileTree(dir: 'lib', include: '*.jar')
-    compile project(':common')
+    compile project(":common")
+    compile project(":framework:framework-ios")
 }
 
 moe {
     xcode {
+        project 'xcode/InAppPurchase.xcodeproj'
         mainTarget 'InAppPurchase'
-        packageName 'org.moe.inapppurchase'
-        launchScreenFilePath 'src/main/resources/LaunchScreen.xib'
-        appIconsSource 'AppIcon'
-        applicationExitOnSuspend false
-        bundleShortVersionString '1.0'
-        bundleVersion '1'
-        deploymentTarget '9.0'
+        testTarget 'InAppPurchase-Test'
+    }
+}
+
+// Setup Eclipse
+eclipse {
+    // Set MOE natures and build commands
+    project {
+        natures 'org.multi-os-engine.project'
     }
 }

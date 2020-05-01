@@ -39,23 +39,23 @@ import org.moe.natj.objc.SEL;
 import org.moe.natj.objc.ann.ObjCClassName;
 import org.moe.natj.objc.ann.Selector;
 
-import ios.NSObject;
-import ios.coregraphics.c.CoreGraphics;
-import ios.foundation.NSIndexPath;
-import ios.foundation.NSMutableArray;
-import ios.foundation.NSNotification;
-import ios.foundation.NSNotificationCenter;
-import ios.uikit.UIBarButtonItem;
-import ios.uikit.UIButton;
-import ios.uikit.UIRefreshControl;
-import ios.uikit.UITableView;
-import ios.uikit.UITableViewCell;
-import ios.uikit.UITableViewController;
-import ios.uikit.enums.UIBarButtonItemStyle;
-import ios.uikit.enums.UIControlEvents;
-import ios.uikit.enums.UIControlState;
-import ios.uikit.enums.UITableViewCellAccessoryType;
-import ios.uikit.enums.UITableViewRowAnimation;
+import apple.NSObject;
+import apple.coregraphics.c.CoreGraphics;
+import apple.foundation.NSIndexPath;
+import apple.foundation.NSMutableArray;
+import apple.foundation.NSNotification;
+import apple.foundation.NSNotificationCenter;
+import apple.uikit.UIBarButtonItem;
+import apple.uikit.UIButton;
+import apple.uikit.UIRefreshControl;
+import apple.uikit.UITableView;
+import apple.uikit.UITableViewCell;
+import apple.uikit.UITableViewController;
+import apple.uikit.enums.UIBarButtonItemStyle;
+import apple.uikit.enums.UIControlEvents;
+import apple.uikit.enums.UIControlState;
+import apple.uikit.enums.UITableViewCellAccessoryType;
+import apple.uikit.enums.UITableViewRowAnimation;
 
 @org.moe.natj.general.ann.Runtime(ObjCRuntime.class)
 @ObjCClassName("MasterViewController")
@@ -84,24 +84,19 @@ public class MasterViewController extends UITableViewController {
         UITableViewCell cell = uiTableView.dequeueReusableCellWithIdentifierForIndexPath("Cell", nsIndexPath);
 
         ProductDetails product = productsStore.getProductAt((int) nsIndexPath.row());
-
         cell.textLabel().setText(product.getTitle());
-
         cell.detailTextLabel().setText(product.getPrice());
-
+        UIButton button = UIButton.alloc().init();
+        button.setTitleColorForState(view().tintColor(), UIControlState.Normal);
         if (productsStore != null && productsStore.isProductPurchased(product.getProductID())) {
-            cell.setAccessoryType(UITableViewCellAccessoryType.Checkmark);
-            cell.setAccessoryView(null);
-            cell.detailTextLabel().setText("");
+            button.setTitleForState("Buy Again", UIControlState.Normal);
         } else {
-            UIButton button = UIButton.alloc().initWithFrame(CoreGraphics.CGRectMake(0, 0, 72, 37));
-            button.setTitleColorForState(view().tintColor(), UIControlState.Normal);
             button.setTitleForState("Buy", UIControlState.Normal);
-            button.setTag(nsIndexPath.row());
-            button.addTargetActionForControlEvents(this, new SEL("buyButtonTapped:"), UIControlEvents.TouchUpInside);
-            cell.setAccessoryType(UITableViewCellAccessoryType.None);
-            cell.setAccessoryView(button);
         }
+        button.sizeToFit();
+        button.setTag(nsIndexPath.row());
+        button.addTargetActionForControlEvents(this, new SEL("buyButtonTapped:"), UIControlEvents.TouchUpInside);
+        cell.setAccessoryView(button);
 
         return cell;
     }
