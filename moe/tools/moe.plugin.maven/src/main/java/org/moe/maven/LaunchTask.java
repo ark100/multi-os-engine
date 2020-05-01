@@ -31,19 +31,24 @@ public class LaunchTask extends BuildGradleTask {
     public static final String OPTIONS_KEY = "-Pmoe.launcher.options=";
 
     /**
-     * @parameter
+     * @parameter expression="${moe.devices}"
      */
     protected String[] deviceIds;
 
     /**
-     * @parameter
+     * @parameter expression="${moe.simulators}"
      */
     protected String[] simulatorIds;
 
     /**
-     * @parameter
+     * @parameter expression="${moe.options}"
      */
     protected String[] options;
+    
+    /**
+     * @parameter expression="${moe.noinstall.ontarget}"
+     */
+    private String noInstallOnTarget;
 
     @Override
     protected String[] tasks() {
@@ -91,13 +96,28 @@ public class LaunchTask extends BuildGradleTask {
             newArgs.add(simulatorIdsParam);
             getLog().info("Simulator ids: " + simulatorIdsParam);
         }
+        
+        OptionsBuilder optionsBuilder = null;
+        
+        boolean isNoInstallOnTarget =
+        		noInstallOnTarget == null || noInstallOnTarget.isEmpty() ? false : Boolean.parseBoolean(noInstallOnTarget);
+        
+        if (isNoInstallOnTarget) {
+        	optionsBuilder = new OptionsBuilder();
+        	optionsBuilder.push("no-install-on-target");
+        }
 
         if (options != null && options.length > 0) {
-            OptionsBuilder optionsBuilder = new OptionsBuilder();
+        	if (optionsBuilder == null) {
+        		optionsBuilder = new OptionsBuilder();
+        	}
             for (String option : options) {
                 optionsBuilder.push(option);
             }
-            String optionsParam = optionsBuilder.toString();
+        }
+        
+        if (optionsBuilder != null) {
+        	String optionsParam = optionsBuilder.toString();
             newArgs.add(optionsParam);
             getLog().info("Options: " + optionsParam);
         }

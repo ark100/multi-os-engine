@@ -41,6 +41,12 @@ public abstract class BuildGradleTask extends GradleTask {
      * @required
      */
     protected File outputDirectory;
+    
+    /**
+     * @parameter expression="${project.build.testOutputDirectory}"
+     * @required
+     */
+    protected File testOutputDirectory;
 
     @Parameter(defaultValue = "${session}", readonly = true, required = true) private MavenSession session;
 
@@ -51,6 +57,16 @@ public abstract class BuildGradleTask extends GradleTask {
      * @readonly
      */
     private DependencyGraphBuilder dependencyGraphBuilder;
+    
+    /**
+     * @parameter expression="${moe.gradle.log.level}"
+     */
+    protected String gradleLogLevel;
+    
+    /**
+     * @parameter expression="${moe.gradle.stacktrace.level}"
+     */
+    protected String gradleStacktraceLevel;
 
     @Override
     protected void addArguments() {
@@ -66,11 +82,19 @@ public abstract class BuildGradleTask extends GradleTask {
                 newArgs.add(arg);
             }
         }
+        
+        if (gradleLogLevel != null) {
+        	newArgs.add(gradleLogLevel);
+        }
+        
+        if (gradleStacktraceLevel != null) {
+        	newArgs.add(gradleStacktraceLevel);
+        }
 
         StringBuilder stringBuilder = new StringBuilder();
         stringBuilder.append(MOE_PROGUARD_INJARS_KEY);
         stringBuilder.append(outputDirectory.getAbsolutePath());
-        getLog().info("Output directory: " + outputDirectory.getAbsolutePath());
+        addTestOutputDirectory(stringBuilder);
 
         List<File> dependencies = getDependencies();
 
@@ -84,6 +108,8 @@ public abstract class BuildGradleTask extends GradleTask {
 
             stringBuilder.deleteCharAt(stringBuilder.length() - 1);
         }
+        
+        addSDKJars(stringBuilder);
 
         String injarsParam = stringBuilder.toString();
         newArgs.add(injarsParam);
@@ -93,7 +119,7 @@ public abstract class BuildGradleTask extends GradleTask {
         newArgs.toArray(args);
     }
 
-    protected List<File> getDependencies() {
+	protected List<File> getDependencies() {
         List<File> dependenciesList = null;
         if (project != null) {
             dependenciesList = new ArrayList<File>();
@@ -155,5 +181,14 @@ public abstract class BuildGradleTask extends GradleTask {
         }
         return children;
     }
+    
+    protected void addSDKJars(StringBuilder stringBuilder) {
+    	
+    }
+    
+    protected void addTestOutputDirectory(StringBuilder stringBuilder) {
+		// TODO Auto-generated method stub
+		
+	}
 
 }

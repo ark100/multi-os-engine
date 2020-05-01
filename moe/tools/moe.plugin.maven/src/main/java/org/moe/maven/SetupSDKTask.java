@@ -40,6 +40,8 @@ public class SetupSDKTask extends GradleTask {
     public static final String MOE_SDK_CORE_JAR = "moe.sdk.coreJar";
     public static final String MOE_SDK_PLATFORM_JAR = "moe.sdk.platformJar";
     public static final String MOE_SDK_JUNIT_JAR = "moe.sdk.junitJar";
+    public static final String MOE_SDK_JAVA8SUPPORT_JAR = "moe.sdk.java8support";
+    public static final String MOE_SDK_HOME = "moe.sdk.home";
 
     /**
      * Used to look up Artifacts in the remote repository.
@@ -61,6 +63,8 @@ public class SetupSDKTask extends GradleTask {
     private String platformJarPath;
 
     private String junitJarPath;
+    
+    private String moeSDKPath;
 
     @SuppressWarnings("unchecked")
     @Override
@@ -93,10 +97,25 @@ public class SetupSDKTask extends GradleTask {
             }
 
             Artifact moe_junit = factory.createArtifact("moe.sdk", MOE_SDK_JUNIT_JAR, "1.0", "system", "jar");
-            moe_junit.setFile(new File(junitJarPath));
+            File junitJar = new File(junitJarPath);
+            moe_junit.setFile(junitJar);
+            MOESdk.setJunitJar(junitJar);
 
             try {
                 artifactResolver.resolve(moe_junit, remoteRepositories, localRepository);
+            } catch (ArtifactResolutionException e) {
+                getLog().error(e);
+            } catch (ArtifactNotFoundException e) {
+                getLog().error(e);
+            }
+            
+            Artifact moe_java8support = factory.createArtifact("moe.sdk", MOE_SDK_JAVA8SUPPORT_JAR, "1.0", "system", "jar");
+            String java8supportPath = moeSDKPath + File.separator + "tools" + File.separator + "java8support.jar";
+            File java8supportJAR = new File(java8supportPath);
+            moe_java8support.setFile(java8supportJAR);
+
+            try {
+                artifactResolver.resolve(moe_java8support, remoteRepositories, localRepository);
             } catch (ArtifactResolutionException e) {
                 getLog().error(e);
             } catch (ArtifactNotFoundException e) {
@@ -109,6 +128,7 @@ public class SetupSDKTask extends GradleTask {
             projectDependencies.add(moe_ios);
             projectDependencies.add(moe_core);
             projectDependencies.add(moe_junit);
+            projectDependencies.add(moe_java8support);
 
             project.setDependencyArtifacts(projectDependencies);
 
@@ -135,6 +155,8 @@ public class SetupSDKTask extends GradleTask {
                     coreJarPath = getValue(line);
                 } else if (line.startsWith(MOE_SDK_JUNIT_JAR)) {
                     junitJarPath = getValue(line);
+                } else if (line.startsWith(MOE_SDK_HOME)) {
+                    moeSDKPath = getValue(line);
                 }
             }
         } catch (IOException e) {

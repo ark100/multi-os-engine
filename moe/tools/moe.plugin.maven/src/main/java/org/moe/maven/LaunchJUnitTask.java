@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2016 Migeran
+Copyright (C) 2017 Migeran
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,23 +19,23 @@ package org.moe.maven;
 import java.io.File;
 
 /**
- * @goal testxcodebuild
+ * @goal launchJUnit
  * @execute phase="compile"
  */
-public class TestXcodeBuidTask extends XcodeBuidTask {
+public class LaunchJUnitTask extends LaunchTask {
 
-    @Override
+	@Override
     protected String[] tasks() {
         return new String[] { "moeTest" };
     }
     
-    protected void addSDKJars(StringBuilder stringBuilder) {
-    	stringBuilder.append(File.pathSeparator);
-    	stringBuilder.append(MOESdk.getJunitJar().getAbsolutePath());
+	protected void addSDKJars(StringBuilder stringBuilder) {
+        stringBuilder.append(File.pathSeparator);
+        stringBuilder.append(MOESdk.getJunitJar().getAbsolutePath());
     }
     
     protected void addTestOutputDirectory(StringBuilder stringBuilder) {
-    	stringBuilder.append(File.pathSeparator);
-    	stringBuilder.append(testOutputDirectory.getAbsolutePath());
-	}
+        stringBuilder.append(File.pathSeparator);
+        stringBuilder.append(testOutputDirectory.getAbsolutePath());
+    }
 }

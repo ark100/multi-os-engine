@@ -2,6 +2,25 @@
 
 ### Deploy to Bintray
 
+Add settings to .m2/settings.xml
+
+```xml
+
+...
+
+<servers>
+  <server>
+    <id>bintray-repo-moe-maven</id>
+    <username>your user name</username>
+    <password>******</password>
+  </server>
+</servers>
+
+...
+
+
+```
+
 ```sh
 $ mvn clean deploy
 ```
@@ -12,7 +31,7 @@ $ mvn clean deploy
 <dependency>
   <groupId>org.multi-os-engine</groupId>
   <artifactId>moe-maven</artifactId>
-  <version>1.0.1</version>
+  <version>1.3.1</version>
   <type>pom</type>
 </dependency>
 ```
