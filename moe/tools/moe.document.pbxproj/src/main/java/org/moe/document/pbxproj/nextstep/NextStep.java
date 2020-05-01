@@ -18,62 +18,76 @@ package org.moe.document.pbxproj.nextstep;
 
 import org.moe.document.pbxproj.nextstep.Tokenizer.Token;
 
-import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 
 public abstract class NextStep {
 
-	public static Dictionary<Value, NextStep> read(File file) throws NextStepException {
-		Tokenizer t = null;
-		try {
-			Parser p = new Parser(file);
-			t = new Tokenizer(p);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		if (t == null) {
-			return null;
-		}
+    public static Dictionary<Value, NextStep> read(InputStream inStream) throws NextStepException {
+        Tokenizer t;
+        try {
+            Parser p = new Parser(inStream);
+            t = new Tokenizer(p);
+        } catch (IOException e) {
+            throw new NextStepException(e);
+        }
 
-		Token token = t.peek();
-		if (token != null && token.kind == Token.Brace_open) {
-			return Dictionary.create(t);
-		}
+        Token token = t.peek();
+        if (token != null && token.kind == Token.Brace_open) {
+            return Dictionary.create(t);
+        }
 
-		return null;
-	}
+        return null;
+    }
 
-	static NextStep get(Tokenizer t) throws NextStepException {
-		Token token = t.peek();
-		if (token == null) {
-			throw new NextStepException("early end of tokenstream");
-		}
-		switch (token.kind) {
-		case Token.Brace_open:
-			return Dictionary.create(t);
-		case Token.Parentheses_open:
-			return Array.create(t);
-		case Token.Value:
-			return Value.create(t);
+    public static Dictionary<Value, NextStep> readString(String content) throws NextStepException {
+        Tokenizer t;
+        try {
+            Parser p = new Parser(content);
+            t = new Tokenizer(p);
+        } catch (IOException e) {
+            throw new NextStepException(e);
+        }
 
-		default:
-			return null;
-		}
-	}
+        Token token = t.peek();
+        if (token != null && token.kind == Token.Brace_open) {
+            return Dictionary.create(t);
+        }
 
-	protected void ident(StringBuilder b, int depth) {
-		for (int i = 0; i < depth; ++i) {
-			b.append('\t');
-		}
-	}
+        return null;
+    }
 
-	@Override
-	public String toString() {
-		return print(0);
-	}
+    static NextStep get(Tokenizer t) throws NextStepException {
+        Token token = t.peek();
+        if (token == null) {
+            throw new NextStepException("early end of token stream");
+        }
+        switch (token.kind) {
+        case Token.Brace_open:
+            return Dictionary.create(t);
+        case Token.Parentheses_open:
+            return Array.create(t);
+        case Token.Value:
+            return Value.create(t);
 
-	public abstract String print(int depth);
+        default:
+            return null;
+        }
+    }
 
-	public abstract String printInline(int depth);
+    protected void ident(StringBuilder b, int depth) {
+        for (int i = 0; i < depth; ++i) {
+            b.append('\t');
+        }
+    }
+
+    @Override
+    public String toString() {
+        return print(0);
+    }
+
+    public abstract String print(int depth);
+
+    public abstract String printInline(int depth);
 
 }

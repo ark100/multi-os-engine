@@ -25,69 +25,62 @@ import java.util.Map;
 @SuppressWarnings("unchecked")
 public class PBXTargetDependency extends PBXObject {
 
-	public static final String NAME_KEY = "name";
-	public static final String TARGET_KEY = "target";
-	public static final String TARGET_PROXY_KEY = "targetProxy";
+    public static final String NAME_KEY = "name";
+    public static final String TARGET_KEY = "target";
+    public static final String TARGET_PROXY_KEY = "targetProxy";
 
-	public PBXTargetDependency(Dictionary<Value, NextStep> dict) {
-		super(dict);
-	}
+    public PBXTargetDependency(Dictionary<Value, NextStep> dict) {
+        super(dict);
+    }
 
-	public PBXTargetDependency() {
-		super(null);
-		setIsa(this.getClass().getSimpleName());
-	}
+    public PBXTargetDependency() {
+        super(null);
+        setIsa(this.getClass().getSimpleName());
+    }
 
-	@Override
-	public String getCommentString() {
-		return "PBXTargetDependency";
-	}
+    @Override
+    public String getCommentString() {
+        return "PBXTargetDependency";
+    }
 
-	@Override
-	public void connectReferences(Map<String, Value> map) {
-		connectReferencesInValue(TARGET_PROXY_KEY, map);
-		connectReferencesInValue(TARGET_KEY, map);
-	}
+    @Override
+    public void connectReferences(Map<String, Value> map) {
+        connectReferencesInValue(TARGET_PROXY_KEY, map);
+        connectReferencesInValue(TARGET_KEY, map);
+    }
 
-	@Override
-	public void update() {
-	}
+    @Override
+    public void removeReference(PBXObjectRef<? extends PBXObject> ref) {
+        removeReferenceFromReferenceValue(TARGET_PROXY_KEY, ref);
+        removeReferenceFromReferenceValue(TARGET_KEY, ref);
+    }
 
-	@Override
-	public void removeReference(PBXObjectRef<? extends PBXObject> ref) {
-		if (ref.equals(getTargetProxy())) {
-			setTargetProxy(null);
-		}
+    /*
+     * Fields
+     */
 
-		if (ref.equals(getTarget())) {
-			setTarget(null);
-		}
-	}
+    public String getName() {
+        return getStringValue(NAME_KEY);
+    }
 
-	/** Fields **/
+    public void setName(String value) {
+        setStringValue(NAME_KEY, value);
+    }
 
-	public String getName() {
-		return getStringValue(NAME_KEY);
-	}
+    public PBXObjectRef<PBXNativeTarget> getTarget() {
+        return getPBXObjectRefValue(TARGET_KEY);
+    }
 
-	public void setName(String value) {
-		setStringValue(NAME_KEY, value);
-	}
+    public void setTarget(PBXObjectRef<PBXNativeTarget> value) {
+        setPBXObjectRefValue(TARGET_KEY, value);
+    }
 
-	public PBXObjectRef<PBXContainerItemProxy> getTarget() {
-		return (PBXObjectRef<PBXContainerItemProxy>) getPBXObjectRefValue(TARGET_KEY);
-	}
+    public PBXObjectRef<PBXContainerItemProxy> getTargetProxy() {
+        return getPBXObjectRefValue(TARGET_PROXY_KEY);
+    }
 
-	public void setTarget(PBXObjectRef<PBXContainerItemProxy> value) {
-		setPBXObjectRefValue(TARGET_KEY, value);
-	}
-
-	public PBXObjectRef<PBXContainerItemProxy> getTargetProxy() {
-		return (PBXObjectRef<PBXContainerItemProxy>) getPBXObjectRefValue(TARGET_PROXY_KEY);
-	}
-
-	public void setTargetProxy(PBXObjectRef<PBXContainerItemProxy> value) {
-		setPBXObjectRefValue(TARGET_PROXY_KEY, value);
-	}
+    public void setTargetProxy(PBXObjectRef<PBXContainerItemProxy> value) {
+        setPBXObjectRefValue(TARGET_PROXY_KEY, value);
+    }
 
 }

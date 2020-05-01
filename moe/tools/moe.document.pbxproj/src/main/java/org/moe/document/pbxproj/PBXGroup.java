@@ -21,79 +21,79 @@ import org.moe.document.pbxproj.nextstep.Dictionary;
 import org.moe.document.pbxproj.nextstep.NextStep;
 import org.moe.document.pbxproj.nextstep.Value;
 
-import java.util.Iterator;
 import java.util.Map;
 
 @SuppressWarnings("unchecked")
 public final class PBXGroup extends PBXObject {
 
-	public static final String CHILDREN_KEY = "children";
-	public static final String NAME_KEY = "name";
-	public static final String PATH_KEY = "path";
-	public static final String SOURCE_TREE_KEY = "sourceTree";
+    public static final String CHILDREN_KEY = "children";
+    public static final String NAME_KEY = "name";
+    public static final String PATH_KEY = "path";
+    public static final String SOURCE_TREE_KEY = "sourceTree";
 
-	public PBXGroup(Dictionary<Value, NextStep> dict) {
-		super(dict);
-	}
+    public PBXGroup(Dictionary<Value, NextStep> dict) {
+        super(dict);
+    }
 
-	public PBXGroup() {
-		super(null);
-		setIsa(this.getClass().getSimpleName());
-	}
+    public PBXGroup() {
+        super(null);
+        setIsa(this.getClass().getSimpleName());
+    }
 
-	@Override
-	public String getCommentString() {
-		String name = getName();
-		if (name != null) {
-			return name;
-		}
+    @Override
+    public String getCommentString() {
+        String name = getName();
+        if (name != null) {
+            return name;
+        }
 
-		return getPath();
-	}
+        return getPath();
+    }
 
-	@Override
-	public void connectReferences(Map<String, Value> map) {
-		connectReferencesInValueArray(CHILDREN_KEY, map);
-	}
+    @Override
+    public void connectReferences(Map<String, Value> map) {
+        connectReferencesInArray(CHILDREN_KEY, map);
+    }
 
-	@Override
-	public void removeReference(PBXObjectRef<? extends PBXObject> ref) {
-		Iterator<?> it = getChildren().iterator();
-		while (it.hasNext()) {
-			if (it.next().equals(ref)) {
-				it.remove();
-			}
-		}
-	}
+    @Override
+    public void removeReference(PBXObjectRef<? extends PBXObject> ref) {
+        removeReferenceFromReferenceArray(CHILDREN_KEY, ref);
+    }
 
-	/** Fields **/
+    /*
+     * Fields
+     */
 
-	public Array<PBXObjectRef<? extends PBXObject>> getChildren() {
-		return (Array<PBXObjectRef<? extends PBXObject>>) getArrayValue(CHILDREN_KEY);
-	}
+    public Array<PBXObjectRef<? extends PBXObject>> getChildrenOrNull() {
+        return getArrayValueOrNull(CHILDREN_KEY);
+    }
 
-	public String getName() {
-		return getStringValue(NAME_KEY);
-	}
+    public Array<PBXObjectRef<? extends PBXObject>> getOrCreateChildren() {
+        return getOrCreateArrayValue(CHILDREN_KEY);
+    }
 
-	public void setName(String value) {
-		setStringValue(NAME_KEY, value);
-	}
+    public String getName() {
+        return getStringValue(NAME_KEY);
+    }
 
-	public String getPath() {
-		return getStringValue(PATH_KEY);
-	}
+    public void setName(String value) {
+        setStringValue(NAME_KEY, value);
+    }
 
-	public void setPath(String value) {
-		setStringValue(PATH_KEY, value);
-	}
+    public String getPath() {
+        return getStringValue(PATH_KEY);
+    }
 
-	public String getSourceTree() {
-		return getStringValue(SOURCE_TREE_KEY);
-	}
+    public void setPath(String value) {
+        setStringValue(PATH_KEY, value);
+    }
 
-	public void setSourceTree(String value) {
-		setStringValue(SOURCE_TREE_KEY, value);
-	}
+    public String getSourceTree() {
+        return getStringValue(SOURCE_TREE_KEY);
+    }
+
+    public void setSourceTree(String value) {
+        setStringValue(SOURCE_TREE_KEY, value);
+    }
 
 }

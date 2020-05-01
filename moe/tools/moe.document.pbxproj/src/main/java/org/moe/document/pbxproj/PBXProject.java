@@ -21,244 +21,253 @@ import org.moe.document.pbxproj.nextstep.Dictionary;
 import org.moe.document.pbxproj.nextstep.NextStep;
 import org.moe.document.pbxproj.nextstep.Value;
 
-import java.util.Iterator;
 import java.util.Map;
 
 @SuppressWarnings("unchecked")
 public final class PBXProject extends PBXObject {
 
-	public static final String ATTRIBUTES_KEY = "attributes";
-	public static final String BUILD_CONFIGURATION_LIST_KEY = "buildConfigurationList";
-	public static final String COMPATIBILITY_VERSION_KEY = "compatibilityVersion";
-	public static final String DEVELOPMENT_REGION_KEY = "developmentRegion";
-	public static final String HAS_SCANNED_FOR_ENCODINGS_KEY = "hasScannedForEncodings";
-	public static final String KNOWN_REGIONS_KEY = "knownRegions";
-	public static final String MAIN_GROUP_KEY = "mainGroup";
-	public static final String PRODUCT_REF_GROUP_KEY = "productRefGroup";
-	public static final String PROJECT_DIR_PATH_KEY = "projectDirPath";
-	public static final String PROJECT_REFERENCES_KEY = "projectReferences";
-	public static final String PROJECT_ROOT_KEY = "projectRoot";
-	public static final String TARGETS_KEY = "targets";
+    public static final String ATTRIBUTES_KEY = "attributes";
+    public static final String BUILD_CONFIGURATION_LIST_KEY = "buildConfigurationList";
+    public static final String COMPATIBILITY_VERSION_KEY = "compatibilityVersion";
+    public static final String DEVELOPMENT_REGION_KEY = "developmentRegion";
+    public static final String HAS_SCANNED_FOR_ENCODINGS_KEY = "hasScannedForEncodings";
+    public static final String KNOWN_REGIONS_KEY = "knownRegions";
+    public static final String MAIN_GROUP_KEY = "mainGroup";
+    public static final String PRODUCT_REF_GROUP_KEY = "productRefGroup";
+    public static final String PROJECT_DIR_PATH_KEY = "projectDirPath";
+    public static final String PROJECT_REFERENCES_KEY = "projectReferences";
+    public static final String PROJECT_ROOT_KEY = "projectRoot";
+    public static final String TARGETS_KEY = "targets";
 
-	private String projectName = "";
+    private String projectName = "";
 
-	public PBXProject(Dictionary<Value, NextStep> dict) {
-		super(dict);
+    public PBXProject(Dictionary<Value, NextStep> dict) {
+        super(dict);
 
-		Array<ProjectReference> refs = getProjectReferences();
-		int count = refs.size();
-		for (int i = 0; i < count; ++i) {
-			refs.set(i, new ProjectReference(refs.get(i)));
-		}
-	}
+        Array<ProjectReference> refs = getProjectReferencesOrNull();
+        for (int i = 0, count = refs == null ? 0 : refs.size(); i < count; ++i) {
+            refs.set(i, new ProjectReference(refs.get(i)));
+        }
+    }
 
-	public PBXProject() {
-		super(null);
-		setIsa(this.getClass().getSimpleName());
-	}
+    public PBXProject() {
+        super(null);
+        setIsa(this.getClass().getSimpleName());
+    }
 
-	public void setProjectName(String projectName) {
-		if (projectName == null) {
-			this.projectName = "";
-		} else {
-			this.projectName = projectName;
-		}
-	}
+    public void setProjectName(String projectName) {
+        if (projectName == null) {
+            this.projectName = "";
+        } else {
+            this.projectName = projectName;
+        }
+    }
 
-	@Override
-	public String getCommentString() {
-		return "Project object";
-	}
+    @Override
+    public String getCommentString() {
+        return "Project object";
+    }
 
-	@Override
-	public void connectReferences(Map<String, Value> map) {
-		connectReferencesInValue(BUILD_CONFIGURATION_LIST_KEY, map);
-		connectReferencesInValue(MAIN_GROUP_KEY, map);
-		connectReferencesInValue(PRODUCT_REF_GROUP_KEY, map);
-		connectReferencesInValueArray(TARGETS_KEY, map);
-		Iterator<ProjectReference> it = getProjectReferences().iterator();
-		while (it.hasNext()) {
-			it.next().connectReferences(map);
-		}
-	}
+    @Override
+    public void connectReferences(Map<String, Value> map) {
+        connectReferencesInValue(BUILD_CONFIGURATION_LIST_KEY, map);
+        connectReferencesInValue(MAIN_GROUP_KEY, map);
+        connectReferencesInValue(PRODUCT_REF_GROUP_KEY, map);
+        connectReferencesInArray(TARGETS_KEY, map);
 
-	@Override
-	public void update() {
-		PBXObjectRef<XCConfigurationList> ref = (PBXObjectRef<XCConfigurationList>) getValue(BUILD_CONFIGURATION_LIST_KEY);
-		if (ref == null) {
-			return;
-		}
-		XCConfigurationList referenced = ref.getReferenced();
-		if (referenced != null) {
-			referenced.target = this;
-		}
-	}
+        Array<ProjectReference> projectReferences = getProjectReferencesOrNull();
+        for (int i = 0, size = projectReferences == null ? 0 : projectReferences.size(); i < size; i++) {
+            ProjectReference reference = projectReferences.get(i);
+            reference.connectReferences(map);
+        }
+    }
 
-	@Override
-	public void removeReference(PBXObjectRef<? extends PBXObject> ref) {
-		if (ref.equals(getBuildConfigurationList())) {
-			setBuildConfigurationList(null);
-		}
+    @Override
+    public void update() {
+        PBXObjectRef<XCConfigurationList> ref = (PBXObjectRef<XCConfigurationList>)get(BUILD_CONFIGURATION_LIST_KEY);
+        if (ref == null) {
+            return;
+        }
+        XCConfigurationList referenced = ref.getReferenced();
+        if (referenced != null) {
+            referenced.target = this;
+        }
+    }
 
-		if (ref.equals(getMainGroup())) {
-			setMainGroup(null);
-		}
+    @Override
+    public void removeReference(PBXObjectRef<? extends PBXObject> ref) {
+        removeReferenceFromReferenceValue(BUILD_CONFIGURATION_LIST_KEY, ref);
+        removeReferenceFromReferenceValue(MAIN_GROUP_KEY, ref);
+        removeReferenceFromReferenceValue(PRODUCT_REF_GROUP_KEY, ref);
+        removeReferenceFromReferenceArray(TARGETS_KEY, ref);
 
-		if (ref.equals(getProductRefGroup())) {
-			setProductRefGroup(null);
-		}
+        Array<ProjectReference> projectReferences = getProjectReferencesOrNull();
+        for (int i = 0, size = projectReferences == null ? 0 : projectReferences.size(); i < size; i++) {
+            ProjectReference reference = projectReferences.get(i);
+            reference.removeReference(ref);
+        }
+    }
 
-		Iterator<?> it = getTargets().iterator();
-		while (it.hasNext()) {
-			if (it.next().equals(ref)) {
-				it.remove();
-			}
-		}
+    public String getProjectName() {
+        return projectName;
+    }
 
-		Iterator<ProjectReference> pref_it = getProjectReferences().iterator();
-		while (pref_it.hasNext()) {
-			pref_it.next().removeReference(ref);
-		}
-	}
+    /*
+     * Fields
+     */
 
-	public String getProjectName() {
-		return projectName;
-	}
+    public Dictionary<Value, Value> getAttributesOrNull() {
+        return getDictionaryValueOrNull(ATTRIBUTES_KEY);
+    }
 
-	/** Fields **/
+    public Dictionary<Value, Value> getOrCreateAttributes() {
+        return getOrCreateDictionaryValue(ATTRIBUTES_KEY);
+    }
 
-	public Dictionary<Value, Value> getAttributes() {
-		return (Dictionary<Value, Value>) getDictionaryValue(ATTRIBUTES_KEY);
-	}
+    public PBXObjectRef<XCConfigurationList> getBuildConfigurationList() {
+        return getPBXObjectRefValue(BUILD_CONFIGURATION_LIST_KEY);
+    }
 
-	public PBXObjectRef<XCConfigurationList> getBuildConfigurationList() {
-		return (PBXObjectRef<XCConfigurationList>) getPBXObjectRefValue(BUILD_CONFIGURATION_LIST_KEY);
-	}
+    public void setBuildConfigurationList(PBXObjectRef<XCConfigurationList> value) {
+        setPBXObjectRefValue(BUILD_CONFIGURATION_LIST_KEY, value);
+    }
 
-	public void setBuildConfigurationList(PBXObjectRef<XCConfigurationList> value) {
-		setPBXObjectRefValue(BUILD_CONFIGURATION_LIST_KEY, value);
-	}
+    public String getCompatibilityVersion() {
+        return getStringValue(COMPATIBILITY_VERSION_KEY);
+    }
 
-	public String getCompatibilityVersion() {
-		return getStringValue(COMPATIBILITY_VERSION_KEY);
-	}
+    public void setCompatibilityVersion(String value) {
+        setStringValue(COMPATIBILITY_VERSION_KEY, value);
+    }
 
-	public void setCompatibilityVersion(String value) {
-		setStringValue(COMPATIBILITY_VERSION_KEY, value);
-	}
+    public String getDevelopmentRegion() {
+        return getStringValue(DEVELOPMENT_REGION_KEY);
+    }
 
-	public String getDevelopmentRegion() {
-		return getStringValue(DEVELOPMENT_REGION_KEY);
-	}
+    public void setDevelopmentRegion(String value) {
+        setStringValue(DEVELOPMENT_REGION_KEY, value);
+    }
 
-	public void setDevelopmentRegion(String value) {
-		setStringValue(DEVELOPMENT_REGION_KEY, value);
-	}
+    public String getHasScannedForEncodings() {
+        return getStringValue(HAS_SCANNED_FOR_ENCODINGS_KEY);
+    }
 
-	public String getHasScannedForEncodings() {
-		return getStringValue(HAS_SCANNED_FOR_ENCODINGS_KEY);
-	}
+    public void setHasScannedForEncodings(String value) {
+        setStringValue(HAS_SCANNED_FOR_ENCODINGS_KEY, value);
+    }
 
-	public void setHasScannedForEncodings(String value) {
-		setStringValue(HAS_SCANNED_FOR_ENCODINGS_KEY, value);
-	}
+    public Array<Value> getKnownRegionsOrNull() {
+        return getArrayValueOrNull(KNOWN_REGIONS_KEY);
+    }
 
-	public Array<Value> getKnownRegions() {
-		return (Array<Value>) getArrayValue(KNOWN_REGIONS_KEY);
-	}
+    public Array<Value> getOrCreateKnownRegions() {
+        return getOrCreateArrayValue(KNOWN_REGIONS_KEY);
+    }
 
-	public PBXObjectRef<PBXGroup> getMainGroup() {
-		return (PBXObjectRef<PBXGroup>) getPBXObjectRefValue(MAIN_GROUP_KEY);
-	}
+    public PBXObjectRef<PBXGroup> getMainGroup() {
+        return getPBXObjectRefValue(MAIN_GROUP_KEY);
+    }
 
-	public void setMainGroup(PBXObjectRef<PBXGroup> value) {
-		setPBXObjectRefValue(MAIN_GROUP_KEY, value);
-	}
+    public void setMainGroup(PBXObjectRef<PBXGroup> value) {
+        setPBXObjectRefValue(MAIN_GROUP_KEY, value);
+    }
 
-	public PBXObjectRef<PBXGroup> getProductRefGroup() {
-		return (PBXObjectRef<PBXGroup>) getPBXObjectRefValue(PRODUCT_REF_GROUP_KEY);
-	}
+    public PBXObjectRef<PBXGroup> getProductRefGroup() {
+        return getPBXObjectRefValue(PRODUCT_REF_GROUP_KEY);
+    }
 
-	public void setProductRefGroup(PBXObjectRef<PBXGroup> value) {
-		setPBXObjectRefValue(PRODUCT_REF_GROUP_KEY, value);
-	}
+    public void setProductRefGroup(PBXObjectRef<PBXGroup> value) {
+        setPBXObjectRefValue(PRODUCT_REF_GROUP_KEY, value);
+    }
 
-	public String getProjectDirPath() {
-		return getStringValue(PROJECT_DIR_PATH_KEY);
-	}
+    public String getProjectDirPath() {
+        return getStringValue(PROJECT_DIR_PATH_KEY);
+    }
 
-	public void setProjectDirPath(String value) {
-		setStringValue(PROJECT_DIR_PATH_KEY, value);
-	}
+    public void setProjectDirPath(String value) {
+        setStringValue(PROJECT_DIR_PATH_KEY, value);
+    }
 
-	public Array<ProjectReference> getProjectReferences() {
-		return (Array<ProjectReference>) getArrayValue(PROJECT_REFERENCES_KEY);
-	}
+    public Array<ProjectReference> getProjectReferencesOrNull() {
+        return getArrayValueOrNull(PROJECT_REFERENCES_KEY);
+    }
 
-	public String getProjectRoot() {
-		return getStringValue(PROJECT_ROOT_KEY);
-	}
+    public Array<ProjectReference> getOrCreateProjectReferences() {
+        return getOrCreateArrayValue(PROJECT_REFERENCES_KEY);
+    }
 
-	public void setProjectRoot(String value) {
-		setStringValue(PROJECT_ROOT_KEY, value);
-	}
+    public String getProjectRoot() {
+        return getStringValue(PROJECT_ROOT_KEY);
+    }
 
-	public Array<PBXObjectRef<PBXNativeTarget>> getTargets() {
-		return (Array<PBXObjectRef<PBXNativeTarget>>) getArrayValue(TARGETS_KEY);
-	}
+    public void setProjectRoot(String value) {
+        setStringValue(PROJECT_ROOT_KEY, value);
+    }
 
-	/** Helper classes **/
+    public Array<PBXObjectRef<PBXNativeTarget>> getTargetsOrNull() {
+        return getArrayValueOrNull(TARGETS_KEY);
+    }
 
-	public static class ProjectReference extends PBXObject {
+    public Array<PBXObjectRef<PBXNativeTarget>> getOrCreateTargets() {
+        return getOrCreateArrayValue(TARGETS_KEY);
+    }
 
-		public ProjectReference(Dictionary<Value, NextStep> dict) {
-			super(dict);
-			setIsa(null);
-		}
+    /*
+     * Helper classes
+     */
 
-		public static final String PRODUCT_GROUP_KEY = "ProductGroup";
-		public static final String PROJECT_REF_KEY = "ProjectRef";
+    public static class ProjectReference extends PBXObject {
 
-		@Override
-		public String getCommentString() {
-			return null;
-		}
+        public ProjectReference(Dictionary<Value, NextStep> dict) {
+            super(dict);
+            setIsa(null);
+        }
 
-		@Override
-		public void connectReferences(Map<String, Value> map) {
-			connectReferencesInValue(PRODUCT_GROUP_KEY, map);
-			connectReferencesInValue(PROJECT_REF_KEY, map);
-		}
+        public static final String PRODUCT_GROUP_KEY = "ProductGroup";
+        public static final String PROJECT_REF_KEY = "ProjectRef";
 
-		@Override
-		public void removeReference(PBXObjectRef<? extends PBXObject> ref) {
-			if (ref.equals(getProductGroup())) {
-				setProductGroup(null);
-			}
+        @Override
+        public String getCommentString() {
+            return null;
+        }
 
-			if (ref.equals(getProjectRef())) {
-				setProjectRef(null);
-			}
-		}
+        @Override
+        public void connectReferences(Map<String, Value> map) {
+            connectReferencesInValue(PRODUCT_GROUP_KEY, map);
+            connectReferencesInValue(PROJECT_REF_KEY, map);
+        }
 
-		/** Fields **/
+        @Override
+        public void removeReference(PBXObjectRef<? extends PBXObject> ref) {
+            if (ref.equals(getProductGroup())) {
+                setProductGroup(null);
+            }
 
-		public PBXObjectRef<PBXGroup> getProductGroup() {
-			return (PBXObjectRef<PBXGroup>) getPBXObjectRefValue(PRODUCT_GROUP_KEY);
-		}
+            if (ref.equals(getProjectRef())) {
+                setProjectRef(null);
+            }
+        }
 
-		public void setProductGroup(PBXObjectRef<PBXGroup> value) {
-			setPBXObjectRefValue(PRODUCT_GROUP_KEY, value);
-		}
+        /*
+         * Fields
+         */
 
-		public PBXObjectRef<PBXFileReference> getProjectRef() {
-			return (PBXObjectRef<PBXFileReference>) getPBXObjectRefValue(PROJECT_REF_KEY);
-		}
+        public PBXObjectRef<PBXGroup> getProductGroup() {
+            return getPBXObjectRefValue(PRODUCT_GROUP_KEY);
+        }
 
-		public void setProjectRef(PBXObjectRef<PBXFileReference> value) {
-			setPBXObjectRefValue(PROJECT_REF_KEY, value);
-		}
+        public void setProductGroup(PBXObjectRef<PBXGroup> value) {
+            setPBXObjectRefValue(PRODUCT_GROUP_KEY, value);
+        }
 
-	}
+        public PBXObjectRef<PBXFileReference> getProjectRef() {
+            return getPBXObjectRefValue(PROJECT_REF_KEY);
+        }
+
+        public void setProjectRef(PBXObjectRef<PBXFileReference> value) {
+            setPBXObjectRefValue(PROJECT_REF_KEY, value);
+        }
+
+    }
 
 }

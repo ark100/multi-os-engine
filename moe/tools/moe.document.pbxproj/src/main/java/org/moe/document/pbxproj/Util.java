@@ -22,70 +22,71 @@ import java.util.List;
 
 public class Util {
 
-	public static <V extends PBXObject> V getFirstConforming(List<PBXObjectRef<V>> array, String key, String value) {
-		Iterator<PBXObjectRef<V>> it = array.iterator();
-		while (it.hasNext()) {
-			V elem = it.next().getReferenced();
-			String stringValue = elem.getStringValue(key);
-			if (stringValue == null) {
-				continue;
-			}
-			if (stringValue.equals(value)) {
-				return elem;
-			}
-		}
-		return null;
-	}
+    public static <V extends PBXObject> V getFirstConforming(List<PBXObjectRef<V>> array, String key, String value) {
+        for (PBXObjectRef<V> reference : array) {
+            V elem = reference.getReferenced();
+            String stringValue = elem.getStringValue(key);
+            if (stringValue == null) {
+                continue;
+            }
+            if (stringValue.equals(value)) {
+                return elem;
+            }
+        }
+        return null;
+    }
 
-	public static <V extends PBXObject> ArrayList<V> getAllConforming(List<PBXObjectRef<V>> array, String key, String value) {
-		ArrayList<V> all = new ArrayList<V>();
-		Iterator<PBXObjectRef<V>> it = array.iterator();
-		while (it.hasNext()) {
-			V elem = it.next().getReferenced();
-			String stringValue = elem.getStringValue(key);
-			if (stringValue == null) {
-				continue;
-			}
-			if (stringValue.equals(value)) {
-				all.add(elem);
-			}
-		}
-		return all;
-	}
+    public static <V extends PBXObject> ArrayList<V> getAllConforming(List<PBXObjectRef<V>> array, String key,
+            String value) {
+        ArrayList<V> all = new ArrayList<V>();
+        for (PBXObjectRef<V> reference : array) {
+            V elem = reference.getReferenced();
+            String stringValue = elem.getStringValue(key);
+            if (stringValue == null) {
+                continue;
+            }
+            if (stringValue.equals(value)) {
+                all.add(elem);
+            }
+        }
+        return all;
+    }
 
-	@SuppressWarnings("unchecked")
-	public static <U extends PBXObject, V extends PBXObject> V getFirstConformingISA(List<PBXObjectRef<U>> array, Class<V> cls) {
-		Iterator<PBXObjectRef<U>> it = array.iterator();
-		String value = cls.getSimpleName();
-		while (it.hasNext()) {
-			U elem = it.next().getReferenced();
-			String stringValue = elem.getStringValue(PBXObject.ISA_KEY);
-			if (stringValue == null) {
-				continue;
-			}
-			if (stringValue.equals(value)) {
-				return (V) elem;
-			}
-		}
-		return null;
-	}
+    @SuppressWarnings("unchecked")
+    public static <U extends PBXObject, V extends PBXObject> V getFirstConformingISA(List<PBXObjectRef<U>> array,
+            Class<V> cls) {
+        Iterator<PBXObjectRef<U>> it = array.iterator();
+        String value = cls.getSimpleName();
+        while (it.hasNext()) {
+            U elem = it.next().getReferenced();
+            String stringValue = elem.getStringValue(PBXObject.ISA_KEY);
+            if (stringValue == null) {
+                continue;
+            }
+            if (stringValue.equals(value)) {
+                return (V)elem;
+            }
+        }
+        return null;
+    }
 
-	@SuppressWarnings("unchecked")
-	public static <U extends PBXObject, V extends PBXObject> ArrayList<V> getAllConformingISA(List<PBXObjectRef<U>> array, Class<V> cls) {
-		ArrayList<V> all = new ArrayList<V>();
-		Iterator<PBXObjectRef<U>> it = array.iterator();
-		String value = cls.getSimpleName();
-		while (it.hasNext()) {
-			U elem = it.next().getReferenced();
-			String stringValue = elem.getStringValue(PBXObject.ISA_KEY);
-			if (stringValue == null) {
-				continue;
-			}
-			if (stringValue.equals(value)) {
-				all.add((V) elem);
-			}
-		}
-		return all;
-	}
+    @SuppressWarnings("unchecked")
+    public static <U extends PBXObject, V extends PBXObject> ArrayList<V> getAllConformingISA(
+            List<PBXObjectRef<U>> array, Class<V> cls) {
+        ArrayList<V> all = new ArrayList<V>();
+        Iterator<PBXObjectRef<U>> it = array.iterator();
+        String value = cls.getSimpleName();
+        while (it.hasNext()) {
+            U elem = it.next().getReferenced();
+            String stringValue = elem.getStringValue(PBXObject.ISA_KEY);
+            if (stringValue == null) {
+                continue;
+            }
+            if (stringValue.equals(value)) {
+                all.add((V)elem);
+            }
+        }
+        return all;
+    }
 
 }

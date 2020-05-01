@@ -21,65 +21,65 @@ import org.moe.document.pbxproj.nextstep.Dictionary;
 import org.moe.document.pbxproj.nextstep.NextStep;
 import org.moe.document.pbxproj.nextstep.Value;
 
-import java.util.Iterator;
 import java.util.Map;
 
 @SuppressWarnings("unchecked")
 public final class PBXVariantGroup extends PBXObject {
 
-	public static final String CHILDREN_KEY = "children";
-	public static final String NAME_KEY = "name";
-	public static final String SOURCE_TREE_KEY = "sourceTree";
+    public static final String CHILDREN_KEY = "children";
+    public static final String NAME_KEY = "name";
+    public static final String SOURCE_TREE_KEY = "sourceTree";
 
-	public PBXVariantGroup(Dictionary<Value, NextStep> dict) {
-		super(dict);
-	}
+    public PBXVariantGroup(Dictionary<Value, NextStep> dict) {
+        super(dict);
+    }
 
-	public PBXVariantGroup() {
-		super(null);
-		setIsa(this.getClass().getSimpleName());
-	}
+    public PBXVariantGroup() {
+        super(null);
+        setIsa(this.getClass().getSimpleName());
+    }
 
-	@Override
-	public String getCommentString() {
-		return getName();
-	}
+    @Override
+    public String getCommentString() {
+        return getName();
+    }
 
-	@Override
-	public void connectReferences(Map<String, Value> map) {
-		connectReferencesInValueArray(CHILDREN_KEY, map);
-	}
+    @Override
+    public void connectReferences(Map<String, Value> map) {
+        connectReferencesInArray(CHILDREN_KEY, map);
+    }
 
-	@Override
-	public void removeReference(PBXObjectRef<? extends PBXObject> ref) {
-		Iterator<?> it = getChildren().iterator();
-		while (it.hasNext()) {
-			if (it.next().equals(ref)) {
-				it.remove();
-			}
-		}
-	}
+    @Override
+    public void removeReference(PBXObjectRef<? extends PBXObject> ref) {
+        removeReferenceFromReferenceArray(CHILDREN_KEY, ref);
+    }
 
-	/** Fields **/
+    /*
+     * Fields
+     */
 
-	public Array<PBXObjectRef<PBXFileReference>> getChildren() {
-		return (Array<PBXObjectRef<PBXFileReference>>) getArrayValue(CHILDREN_KEY);
-	}
+    public Array<PBXObjectRef<PBXFileReference>> getChildrenOrNull() {
+        return getArrayValueOrNull(CHILDREN_KEY);
+    }
 
-	public String getName() {
-		return getStringValue(NAME_KEY);
-	}
+    public Array<PBXObjectRef<PBXFileReference>> getOrCreateChildren() {
+        return getOrCreateArrayValue(CHILDREN_KEY);
+    }
 
-	public void setName(String value) {
-		setStringValue(NAME_KEY, value);
-	}
+    public String getName() {
+        return getStringValue(NAME_KEY);
+    }
 
-	public String getSourceTree() {
-		return getStringValue(SOURCE_TREE_KEY);
-	}
+    public void setName(String value) {
+        setStringValue(NAME_KEY, value);
+    }
 
-	public void setSourceTree(String value) {
-		setStringValue(SOURCE_TREE_KEY, value);
-	}
+    public String getSourceTree() {
+        return getStringValue(SOURCE_TREE_KEY);
+    }
+
+    public void setSourceTree(String value) {
+        setStringValue(SOURCE_TREE_KEY, value);
+    }
 
 }
