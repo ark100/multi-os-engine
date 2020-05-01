@@ -16,20 +16,27 @@ limitations under the License.
 
 package org.moe.xcode;
 
-import org.moe.document.pbxproj.*;
+import org.moe.document.pbxproj.PBXBuildFile;
+import org.moe.document.pbxproj.PBXBuildPhase;
+import org.moe.document.pbxproj.PBXFileReference;
+import org.moe.document.pbxproj.PBXGroup;
+import org.moe.document.pbxproj.PBXObjectRef;
+import org.moe.document.pbxproj.PBXResourcesBuildPhase;
+import org.moe.document.pbxproj.PBXSourcesBuildPhase;
+import org.moe.document.pbxproj.ProjectFile;
 
 import java.io.File;
 import java.util.List;
 
 public class XCodeProjectFileManager {
-    private final ProjFile project;
+    private final ProjectFile project;
 
     public enum FileType {
         Resource,
         Sources
     }
 
-    public XCodeProjectFileManager(ProjFile project) {
+    public XCodeProjectFileManager(ProjectFile project) {
         this.project = project;
     }
 
@@ -47,7 +54,7 @@ public class XCodeProjectFileManager {
         }
 
         PBXObjectRef<PBXFileReference> frNewFile = project.createReference(new PBXFileReference());
-        project.getRoot().getObjects().add(frNewFile);
+        project.getRoot().getObjects().put(frNewFile);
         frNewFile.getReferenced().setPath(filePath);
         frNewFile.getReferenced().setName(getFileName(filePath));
 
@@ -81,7 +88,7 @@ public class XCodeProjectFileManager {
             return false;
         }
 
-        desiredGroup.getChildren().add(frNewFile);
+        desiredGroup.getOrCreateChildren().add(frNewFile);
 
         PBXObjectRef<PBXBuildPhase> buildPhase = null;
 

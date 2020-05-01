@@ -16,153 +16,174 @@ limitations under the License.
 
 package org.moe.idea.compiler;
 
-import org.moe.common.exec.ExecRunnerBase;
+import com.intellij.execution.ExecutionException;
+import com.intellij.execution.configurations.GeneralCommandLine;
+import com.intellij.openapi.module.Module;
+import com.intellij.openapi.util.text.StringUtil;
+import org.moe.common.configuration.RemoteSettings;
 import org.moe.common.exec.GradleExec;
-import org.moe.common.exec.ExecRunner;
-import org.moe.idea.ui.MOEToolWindow;
-import com.intellij.openapi.progress.ProgressIndicator;
-import com.intellij.openapi.progress.Task;
-import com.intellij.openapi.project.Project;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-import res.MOEText;
+import org.moe.idea.MOEGlobalSettings;
+import org.moe.idea.runconfig.configuration.MOERunConfiguration;
+import org.moe.idea.utils.ModuleUtils;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 
-public abstract class MOEGradleRunner extends Task.Backgroundable {
+public class MOEGradleRunner {
 
-    private final List<GradleTask> tasks;
+    private final MOERunConfiguration runConfig;
 
-    private ProgressIndicator progressIndicator;
-
-    public MOEGradleRunner(@Nullable Project project, @NotNull String title, boolean canBeCancelled, List<GradleTask> tasks) {
-        super(project, title, canBeCancelled);
-
-        this.tasks = tasks;
+    public MOEGradleRunner(MOERunConfiguration runConfig) {
+        if (runConfig == null) {
+            throw new NullPointerException();
+        }
+        this.runConfig = runConfig;
     }
 
-    @Override
-    public void run(@NotNull ProgressIndicator progressIndicator) {
-        this.progressIndicator = progressIndicator;
+    public static GeneralCommandLine construct(Module module, String... args) {
+        final List<String> cmdargs = new ArrayList<String>();
 
+        // Get Gradle
+        File workingDir = new File(ModuleUtils.getModulePath(module));
+        GradleExec exec = new GradleExec(workingDir);
+        cmdargs.add(exec.getExecPath());
 
-        try {
-            build();
-        } catch (IOException e) {
-            error("Unable to launch gradle task. Make sure gradle is installed.");
-        } catch (Exception e) {
-            error("Internal error in gradle runner.\n" + e.toString());
-        } finally {
-            progressIndicator.stop();
+        for (String arg : args) {
+            cmdargs.add(arg);
         }
+
+        return new GeneralCommandLine(cmdargs).withWorkDirectory(workingDir);
     }
 
-    private GradleExec createExec(GradleTask task) throws IOException {
-        File buildDirectory = new File(task.directory());
+    public GeneralCommandLine construct(boolean isDebug, boolean isLaunch) throws ExecutionException {
+        final List<String> args = new ArrayList<String>();
 
-        GradleExec exec = new GradleExec(buildDirectory, null, buildDirectory);
+        // Get Gradle
+        Module module = runConfig.module();
+        File workingDir = new File(ModuleUtils.getModulePath(module));
+        GradleExec exec = new GradleExec(workingDir);
+        args.add(exec.getExecPath());
 
-        exec.getArguments().add(task.task());
-        exec.getArguments().addAll(task.arguments());
-
-        return exec;
-    }
-
-    private boolean runExec(GradleExec exec) {
-        boolean result = false;
-
-        ExecRunner runner;
-        try {
-            runner = exec.getRunner();
-        } catch (Exception e) {
-            return false;
+        // Pass moe task
+        if (runConfig.runJUnitTests()) {
+            args.add("moeTest");
+        } else {
+            args.add("moeLaunch");
         }
 
-        runner.setListener(new ExecRunnerBase.ExecRunnerListener() {
-            @Override
-            public void stdout(String line) {
-                MOEToolWindow.getInstance(getProject()).log(line);
-            }
-
-            @Override
-            public void stderr(String line) {
-                MOEToolWindow.getInstance(getProject()).error(line);
-            }
-        });
-
-        try {
-            result = (runner.run(null) == 0);
+        MOEGlobalSettings globalSettings = MOEGlobalSettings.getInstance();
+        String logLevel = globalSettings.getGradleLoggingLevel();
+        if (logLevel != null && !logLevel.isEmpty()) {
+            args.add(logLevel);
         }
-        catch (IOException e) {
+        String stacktraceLevel = globalSettings.getGradleStacktraceLevel();
+        if (stacktraceLevel != null && !stacktraceLevel.isEmpty()) {
+            args.add(stacktraceLevel);
         }
 
-        return result;
-    }
+        final OptionsBuilder options = new OptionsBuilder();
 
-    private boolean build() throws IOException {
-        boolean result = true;
-
-        progressIndicator.pushState();
-        progressIndicator.setText(MOEText.get("MOE.Build"));
-        progressIndicator.setIndeterminate(true);
-
-        for (GradleTask task : tasks) {
-            GradleExec exec = createExec(task);
-
-            if (!runExec(exec)) {
-                result = false;
-                break;
-            }
-
+        // Push mode
+        if (isLaunch) {
+            options.push("no-build");
+            options.push("no-install-on-target");
+        } else {
+            options.push("no-launch");
+            options.push("install-on-target");
         }
 
-        if (progressIndicator.isCanceled()) {
-            cancel();
-        }
-        else {
-            if (result) {
-                success();
-            }
-            else {
-                error("see above");
+        // Push config
+        options.push("config:" + runConfig.configuration());
+
+        // Push debug
+        if (isDebug) {
+            if (runConfig.runOnSimulator()) {
+                options.push("debug:" + runConfig.debugPort());
+            } else {
+                options.push("debug:" + runConfig.debugPort() + ":" + runConfig.debugRemotePort());
             }
         }
 
-        return result;
+        List<String> vmArgs = runConfig.getVMArguments();
+        if (vmArgs != null) {
+            for (String arg : vmArgs) {
+                if (arg != null && !arg.isEmpty()) {
+                    options.push("vmarg:" + arg);
+                }
+            }
+        }
+
+        Map<String, String> environmentVariables = runConfig.getEnvironmentVariables();
+        if (environmentVariables != null) {
+            for (Map.Entry<String, String> arg : environmentVariables.entrySet()) {
+                options.push("env:" + arg.getKey() + "=" + arg.getValue());
+            }
+        }
+
+        List<String> programArguments = runConfig.getProgramArguments();
+        if (programArguments != null) {
+            for (String arg : programArguments) {
+                if (arg != null && !arg.isEmpty()) {
+                    options.push("arg:" + arg);
+                }
+            }
+        }
+
+        // Push test args
+        if (runConfig.runJUnitTests()) {
+            options.push("raw-test-output");
+            String[] testArgs = runConfig.getTestArgs();
+            if (testArgs != null) {
+                for (String testArg : testArgs) {
+                    if (testArg != null && !testArg.isEmpty()) {
+                        options.push("arg:" + testArg);
+                    }
+                }
+            }
+        }
+
+        // Pass option
+        final String optionsString = options.toString();
+        if (optionsString.length() > 0) {
+            args.add(optionsString);
+        }
+
+        // Pass remote build settings
+        if (runConfig.isRemoteBuildEnabled()) {
+            args.add("-Pmoe.remotebuild.properties.ignore");
+            Properties properties = RemoteSettings.getProperties(runConfig.getRemoteHost(), Integer.toString(runConfig.getRemotePort()),
+                    runConfig.getRemoteUser(), runConfig.getRemoteKnownhosts(), runConfig.getRemoteIdentity(),
+                    runConfig.getRemoteKeychainName(), runConfig.getRemoteKeychainPass(),
+                    Integer.toString(runConfig.getRemoteKeychainLocktimeout()), runConfig.getRemoteGradleRepositories());
+            RemoteSettings.getArguments("-P", properties, args);
+        }
+
+        // Pass target device
+        if (runConfig.runOnSimulator()) {
+            args.add("-Pmoe.launcher.simulators=" + runConfig.simulatorUdid());
+        } else {
+            if (!StringUtil.isEmptyOrSpaces(runConfig.deviceUdid())) {
+                args.add("-Pmoe.launcher.devices=" + runConfig.deviceUdid());
+            }
+        }
+
+        return new GeneralCommandLine(args).withWorkDirectory(workingDir);
     }
 
-    protected abstract void success();
-    protected abstract void error(String error);
-    protected abstract void cancel();
+    private static class OptionsBuilder {
+        private final StringBuilder builder = new StringBuilder();
 
-    static public class GradleTask
-    {
-        private final List<String> arguments;
-        private final String task;
-        private final String directory;
-
-        public GradleTask(String task, List<String> arguments, String directory) {
-            this.task = task;
-
-            this.directory = directory;
-
-            this.arguments = new ArrayList<String>();
-            this.arguments.addAll(arguments);
+        OptionsBuilder push(String value) {
+            builder.append(",").append(value.replaceAll(",", "\\\\,"));
+            return this;
         }
 
-        public String task() {
-            return task;
-        }
-
-        public List<String> arguments() {
-            return arguments;
-        }
-
-        public String directory() {
-            return directory;
+        @Override
+        public String toString() {
+            return builder.length() == 1 ? "" : ("-Pmoe.launcher.options=" + builder.substring(1));
         }
     }
 }

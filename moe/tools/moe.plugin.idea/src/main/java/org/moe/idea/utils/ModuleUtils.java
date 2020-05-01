@@ -16,15 +16,19 @@ limitations under the License.
 
 package org.moe.idea.utils;
 
-import org.moe.common.exec.ExecOutputCollector;
-import org.moe.common.exec.GradleExec;
-import com.intellij.openapi.application.*;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.application.WriteAction;
+import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil;
+import com.intellij.openapi.fileChooser.FileChooser;
+import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleManager;
-import com.intellij.openapi.progress.ProgressIndicator;
-import com.intellij.openapi.progress.ProgressManager;
-import com.intellij.openapi.progress.Task;
+import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.startup.StartupManager;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.util.DisposeAwareRunnable;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
@@ -32,19 +36,15 @@ import java.io.File;
 public class ModuleUtils {
 
     public static final String MODULE_PATH_KEY = "external.linked.project.path";
+    public static final String MODULE_ID_KEY = "external.linked.project.id";
     public static final String XCODE_PROJECT_PATH_KEY = "moe.xcode.xcodeProjectPath";
     public static final String MAIN_PRODUCT_NAME_KEY = "moe.xcode.mainProductName";
 
-    public static final String XCODE_PROJECT_PATH_TASK = "moeXcodeProjectPath";
+    public static final String XCODE_PROJECT_PATH_TASK = "moeXcodeProperties";
     public static final String MAIN_PRODUCT_NAME_TASK = "moeMainProductName";
 
     public static Module findModuleByName(Project project, String moduleName) {
-        AccessToken token = ReadAction.start();
-        try {
-            return ModuleManager.getInstance(project).findModuleByName(moduleName);
-        } finally {
-            token.finish();
-        }
+        return ReadAction.compute(() -> ModuleManager.getInstance(project).findModuleByName(moduleName));
     }
     
     public static void setOption(Module module, String key, String value) {
@@ -52,32 +52,14 @@ public class ModuleUtils {
             return;
         }
 
-        final Module m = module;
-        final String k = key, v = value;
-
-        runInDispatchedThread(new Runnable() {
-            @Override
-            public void run() {
-                AccessToken token = WriteAction.start();
-                try {
-                    m.setOption(k, v);
-                } finally {
-                    token.finish();
-                }
-            }
-        });
+        runInDispatchedThread(() -> WriteAction.run(() -> module.setOption(key, value)));
     }
-    
+
     public static String getOption(Module module, String key) {
         if (module == null) {
             return null;
         }
-        AccessToken token = ReadAction.start();
-        try {
-            return module.getOptionValue(key);
-        } finally {
-            token.finish();
-        }
+        return ReadAction.compute(() -> module.getOptionValue(key));
     }
 
     public static void setXcodeProjectPath(Module module, String xcodeProjectPath) {
@@ -97,13 +79,19 @@ public class ModuleUtils {
     }
 
     public static String getModulePath(Module module) {
-        if (module.getModuleFile() == null) {
-            module.getProject().save();
-        }
-        String modulePath = getOption(module, MODULE_PATH_KEY);
+        String modulePath = ExternalSystemApiUtil.getExternalProjectPath(module);
+
         if ((modulePath == null) || modulePath.isEmpty()) {
-            modulePath = new File(module.getModuleFilePath()).getParent();
+            if (module.getModuleFile() == null) {
+                module.getProject().save();
+            }
+
+            modulePath = getOption(module, MODULE_PATH_KEY);
+            if ((modulePath == null) || modulePath.isEmpty()) {
+                modulePath = new File(module.getModuleFilePath()).getParent();
+            }
         }
+
         return modulePath;
     }
 
@@ -111,80 +99,67 @@ public class ModuleUtils {
         return getModulePath(findModuleByName(project, moduleName));
     }
 
-    public static String retrievePropertyFromGradle(Module module, String taskName, String modulePropertyKey) {
-        String property = null;
+    public static String getModuleId(Module module) {
+        String moduleId = ExternalSystemApiUtil.getExternalProjectId(module);
 
-        String modulePath = ModuleUtils.getModulePath(module);
-        if ((modulePath == null) || modulePath.isEmpty()) {
-            return property;
+        if ((moduleId == null) || moduleId.isEmpty()) {
+            if (module.getModuleFile() == null) {
+                module.getProject().save();
+            }
+
+            moduleId = getOption(module, MODULE_ID_KEY);
+            if ((moduleId == null) || moduleId.isEmpty()) {
+                moduleId = module.getName();
+            }
         }
 
-        File moduleDir = new File(modulePath);
-
-        GradleExec exec = new GradleExec(moduleDir, null, moduleDir);
-        exec.getArguments().add(taskName);
-        exec.getArguments().add("-Dorg.gradle.daemon=true");
-        exec.getArguments().add("-Dorg.gradle.configureondemand=true");
-
-        String keyWord = modulePropertyKey + ':';
-
-        try {
-            property = ExecOutputCollector.collect(exec);
-            property = property.substring(property.lastIndexOf(keyWord) + keyWord.length()).replace("\t", "");
-            property = property.substring(0, property.indexOf('\n'));
-        } catch (Exception e) {
-            System.out.println(e.getMessage());
-            property = null;
-        }
-
-        return property;
+        return moduleId;
     }
 
-    public static String retrieveXcodeProjectPathFromGradle(Module module) {
-        return retrievePropertyFromGradle(module, XCODE_PROJECT_PATH_TASK, XCODE_PROJECT_PATH_KEY);
+    public static String getModuleId(Project project, String moduleName) {
+        return getModuleId(findModuleByName(project, moduleName));
     }
 
-    public static void updateXcodeProjectPath(Module module) {
-        final Module targetModule = module;
-        ProgressManager.getInstance().run(new Task.Backgroundable(module.getProject(), "Title") {
-            public void run(@NotNull ProgressIndicator progressIndicator) {
-                progressIndicator.pushState();
-
-                progressIndicator.setText("Sync with gradle...");
-                progressIndicator.setIndeterminate(true);
-
-                final String projectPath = retrieveXcodeProjectPathFromGradle(targetModule);
-                setXcodeProjectPath(targetModule, projectPath);
-
-                progressIndicator.setText("Done");
-                progressIndicator.popState();
-            }
-        });
-    }
-
-    public static String retrieveProductNameFromGradle(Module module) {
-        return retrievePropertyFromGradle(module, MAIN_PRODUCT_NAME_TASK, MAIN_PRODUCT_NAME_KEY);
-    }
-
-    public static void updateProductName(Module module) {
-        final Module targetModule = module;
-        ProgressManager.getInstance().run(new Task.Backgroundable(module.getProject(), "Title") {
-            public void run(@NotNull ProgressIndicator progressIndicator) {
-                progressIndicator.pushState();
-
-                progressIndicator.setText("Sync with gradle...");
-                progressIndicator.setIndeterminate(true);
-
-                final String productName = retrieveProductNameFromGradle(targetModule);
-                setProductName(targetModule, productName);
-
-                progressIndicator.setText("Done");
-                progressIndicator.popState();
-            }
-        });
-    }
-
-    private static void runInDispatchedThread(@NotNull Runnable runnable) {
+    public static void runInDispatchedThread(@NotNull Runnable runnable) {
         ApplicationManager.getApplication().invokeLater(runnable);
+    }
+
+    public static void runWhenInitialized(Project project, Runnable r) {
+        if(!project.isDisposed()) {
+            if(isNoBackgroundMode()) {
+                r.run();
+            } else if(!project.isInitialized()) {
+                StartupManager.getInstance(project).registerPostStartupActivity(DisposeAwareRunnable.create(r, project));
+            } else {
+                runDumbAware(project, r);
+            }
+        }
+    }
+
+    public static boolean isNoBackgroundMode() {
+        return ApplicationManager.getApplication().isUnitTestMode() || ApplicationManager.getApplication().isHeadlessEnvironment();
+    }
+
+    public static void runDumbAware(Project project, Runnable r) {
+        if(DumbService.isDumbAware(r)) {
+            r.run();
+        } else {
+            DumbService.getInstance(project).runWhenSmart(DisposeAwareRunnable.create(r, project));
+        }
+
+    }
+
+    public static String selectDir(Module module) {
+        FileChooserDescriptor descriptor = new FileChooserDescriptor(false, true, false, false, false, false);
+        VirtualFile root = FileChooser.chooseFile(descriptor, module.getProject(), null);
+        if (root != null) {
+            String modulePath = getModulePath(module);
+            String dirPath = root.getCanonicalPath();
+            if (dirPath.startsWith(modulePath)) {
+                dirPath = dirPath.substring(modulePath.length() + 1, dirPath.length());
+            }
+            return dirPath;
+        }
+        return null;
     }
 }

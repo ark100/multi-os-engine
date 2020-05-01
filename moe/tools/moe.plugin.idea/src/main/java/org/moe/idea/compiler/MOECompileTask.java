@@ -1,5 +1,5 @@
 /*
-Copyright 2014-2016 Intel Corporation
+Copyright (C) 2016 Migeran
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,351 +16,198 @@ limitations under the License.
 
 package org.moe.idea.compiler;
 
-import org.moe.common.constants.ProductType;
-import org.moe.common.PasswordEntry;
-import org.moe.common.variant.ModeVariant;
-import org.moe.idea.MOESdkPlugin;
-import org.moe.idea.runconfig.MOEIpaConfiguration;
-import org.moe.idea.runconfig.configuration.local.MOERunConfigurationLocal;
-import org.moe.idea.runconfig.configuration.remote.MOERunConfigurationRemote;
-import org.moe.idea.ui.MOEToolWindow;
-import com.intellij.compiler.options.CompileStepBeforeRun;
+import com.intellij.execution.ExecutionException;
+import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.execution.configurations.RunConfiguration;
-import com.intellij.ide.passwordSafe.PasswordSafeException;
-import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.execution.process.OSProcessHandler;
+import com.intellij.execution.process.ProcessAdapter;
+import com.intellij.execution.process.ProcessEvent;
+import com.intellij.execution.process.ProcessOutputTypes;
 import com.intellij.openapi.compiler.CompileContext;
 import com.intellij.openapi.compiler.CompileTask;
+import com.intellij.openapi.compiler.CompilerManager;
 import com.intellij.openapi.compiler.CompilerMessageCategory;
-import com.intellij.openapi.project.Project;
+import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.MessageType;
-import com.intellij.util.concurrency.Semaphore;
+import com.intellij.openapi.util.Key;
 import com.intellij.util.ui.UIUtil;
-import res.MOEText;
+import org.moe.idea.runconfig.configuration.MOERunConfiguration;
+import org.moe.idea.ui.DeviceChooserDialog;
+import org.moe.idea.ui.MOEToolWindow;
+import org.moe.idea.utils.logger.LoggerFactory;
 
-import javax.swing.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.io.IOException;
 
 public class MOECompileTask implements CompileTask {
+    private static final Logger LOG = LoggerFactory.getLogger(MOECompileTask.class);
 
-    private Project project;
-    private List<String> argsToClean;
-    private List<CompileTask> postGradleCompileTasks;
-
-
-    public MOECompileTask() {
-        argsToClean = new ArrayList<String>();
-        postGradleCompileTasks = new ArrayList<CompileTask>();
-    }
+    private boolean isOpenDialog;
+    private boolean canceled;
 
     @Override
-    public boolean execute(CompileContext compileContext) {
-        if (compileContext.getMessageCount(CompilerMessageCategory.ERROR) > 0) {
-            return false;
-        }
+    public boolean execute(CompileContext context) {
+        RunConfiguration c = context.getCompileScope().getUserData(CompilerManager.RUN_CONFIGURATION_KEY);
 
-        Object configuration = compileContext.getCompileScope().getUserData(CompileStepBeforeRun.RUN_CONFIGURATION);
-
-        if (configuration == null) {
-            configuration = compileContext.getCompileScope().getUserData(MOEIpaConfiguration.IPA_KEY);
-        }
-
-        List<MOEGradleRunner.GradleTask> tasks = new ArrayList<MOEGradleRunner.GradleTask>();
-
-        if (configuration instanceof MOERunConfigurationLocal) {
-            MOERunConfigurationLocal runConfiguration = (MOERunConfigurationLocal) configuration;
-
-            project = runConfiguration.getProject();
-
-            tasks.addAll(createBuildApplicationTasks(runConfiguration));
-        } else if (configuration instanceof MOERunConfigurationRemote) {
-            MOERunConfigurationRemote remoteConfiguration = (MOERunConfigurationRemote) configuration;
-
-            project = remoteConfiguration.getProject();
-            remoteConfiguration.productType(ProductType.app);
-            remoteConfiguration.configuration(ModeVariant.DEBUG_NAME);
-
-            try {
-                tasks.addAll(createBuildApplicationRemoteTasks(remoteConfiguration));
-            } catch (Exception e) {
-                MOEToolWindow.getInstance(project).log(e.getMessage());
-                return false;
-            }
-
-            postGradleCompileTasks.add(new MOERemoteCompileTask(remoteConfiguration));
-        } else if (configuration instanceof MOEIpaConfiguration) {
-            MOEIpaConfiguration ipaConfiguration = (MOEIpaConfiguration) configuration;
-            RunConfiguration runConfiguration = ipaConfiguration.runConfiguration();
-
-            if (runConfiguration instanceof MOERunConfigurationRemote) {
-                // Build IPA on remote build server
-                MOERunConfigurationRemote remoteConfiguration = (MOERunConfigurationRemote) runConfiguration;
-
-                project = remoteConfiguration.getProject();
-                remoteConfiguration.configuration(ModeVariant.RELEASE_NAME);
-                remoteConfiguration.productType(ProductType.ipa);
-
-                try {
-                    tasks.addAll(createBuildApplicationRemoteTasks((MOERunConfigurationRemote) runConfiguration));
-                } catch (Exception e) {
-                    MOEToolWindow.getInstance(project).log(e.getMessage());
-                    return false;
-                }
-
-                postGradleCompileTasks.add(new MOERemoteCompileTask(remoteConfiguration));
-            } else {
-                project = ipaConfiguration.getProject();
-
-                try {
-                    tasks.addAll(createBuildIpaTasks(ipaConfiguration));
-                } catch (Exception e) {
-                    MOEToolWindow.getInstance(project).log(e.getMessage());
-                    return false;
-                }
-            }
-        }
-        else {
-            // return false causes 'Compilation aborted' for non MOE modules
+        if (!(c instanceof MOERunConfiguration)) {
             return true;
         }
 
-        if (invokeGradle(tasks)) {
+        final MOERunConfiguration runConfig = (MOERunConfiguration) c;
+        isOpenDialog = runConfig.getOpenDeploymentTargetDialog();
+        canceled = false;
+        runConfig.setCanceled(canceled);
 
-            boolean compileResult = (postGradleCompileTasks.size() == 0) || invokePostGradleCompileTasks(compileContext);
-            if (!compileResult) return compileResult;
-
-            if (configuration instanceof MOEIpaConfiguration) {
-
-                MOEIpaConfiguration ipaConfiguration = (MOEIpaConfiguration) configuration;
-
-                String appPath = MOESdkPlugin.getXcodeBuildAppPath(ipaConfiguration.module(), ipaConfiguration.architecture(), ipaConfiguration.configuration(), false);
-
-                appPath = appPath.replace(".app", ".ipa");
-
-                compileContext.putUserData(MOEIpaConfiguration.IPA_PATH, appPath);
-            }
-
-            return compileResult;
-        }
-
-        return false;
-    }
-
-    private List<MOEGradleRunner.GradleTask> createBuildApplicationTasks(MOERunConfigurationLocal configuration) {
-        List<MOEGradleRunner.GradleTask> list = new ArrayList<MOEGradleRunner.GradleTask>();
-
-        String modulePath = configuration.modulePath();
-        if ((modulePath == null) || modulePath.isEmpty()) {
-            return list;
-        }
-
-        List<String> args = new ArrayList<String>();
-
-        String target = configuration.runJUnitTests() ? "moeTest" : "moeMain";
-        String taskName = String.format(target + "%s%sXcodeBuild", configuration.configuration(), configuration.runOnSimulator() ? "Iphonesimulator" : "Iphoneos");
-        MOEGradleRunner.GradleTask task = new MOEGradleRunner.GradleTask(taskName, args, modulePath);
-        list.add(task);
-
-        return list;
-    }
-
-    private List<MOEGradleRunner.GradleTask> createBuildApplicationRemoteTasks(MOERunConfigurationRemote remoteConfiguration)
-            throws PasswordSafeException {
-        List<MOEGradleRunner.GradleTask> list = new ArrayList<MOEGradleRunner.GradleTask>();
-
-        String modulePath = remoteConfiguration.modulePath();
-        if ((modulePath == null) || modulePath.isEmpty()) {
-            return list;
-        }
-
-        List<String> args = new ArrayList<String>();
-
-        String taskName = String.format("moeMain%sIphoneosOutsidePackager", remoteConfiguration.configuration());
-
-        MOEGradleRunner.GradleTask task = new MOEGradleRunner.GradleTask(taskName, args, modulePath);
-        list.add(task);
-
-        return list;
-    }
-
-    private List<MOEGradleRunner.GradleTask> createBuildIpaTasks(MOEIpaConfiguration configuration) {
-        List<MOEGradleRunner.GradleTask> list = new ArrayList<MOEGradleRunner.GradleTask>();
-
-        String modulePath = configuration.modulePath();
-        if ((modulePath == null) || modulePath.isEmpty()) {
-            return list;
-        }
-
-        RunConfiguration runConfig = configuration.runConfiguration();
-        String profilePath = "";
-        if (runConfig instanceof MOERunConfigurationRemote) {
-            profilePath = ((MOERunConfigurationRemote)runConfig).profilePath();
-        }
-
-        List<String> args = new ArrayList<String>();
-
-        args.add("-Pmoe.ipaOptions.provisioningProfile=" + profilePath);
-        args.add("-Pmoe.ipaOptions.signingIdentity=" + configuration.signingIdentity().name());
-
-        MOEGradleRunner.GradleTask task = new MOEGradleRunner.GradleTask("moeIpaBuild", args, modulePath);
-
-        list.add(task);
-
-        return list;
-    }
-
-    private boolean invokeGradle(List<MOEGradleRunner.GradleTask> tasks) {
-
-        final AtomicBoolean result = new AtomicBoolean();
-
+        final MOEToolWindow toolWindow = MOEToolWindow.getInstance(runConfig.getProject());
         UIUtil.invokeAndWaitIfNeeded(new Runnable() {
+            @Override
             public void run() {
-                MOEToolWindow.getInstance(project).showAndCreate(project);
+                toolWindow.clear();
+                if (isOpenDialog) {
+                    DeviceChooserDialog dialog = new DeviceChooserDialog(runConfig.module(), runConfig);
+                    dialog.show();
+                    if (dialog.getExitCode() != DialogWrapper.OK_EXIT_CODE) {
+                        canceled = true;
+                        runConfig.setCanceled(canceled);
+                    }
+                    isOpenDialog = false;
+                }
             }
         });
-
-        MOEToolWindow.getInstance(project).clear();
-        MOEToolWindow.getInstance(project).log(MOEText.get("Build.Started") + " (" + MOESdkPlugin.getPluginVersion() + ")");
-
         try {
-            final Semaphore completed = new Semaphore();
-            completed.down();
 
-            final MOEGradleRunner runner = new MOEGradleRunner(project,
-                    MOEText.get("MOE.Build"),
-                    true,
-                    tasks) {
-
-                @Override
-                protected void success() {
-                    MOEToolWindow.getInstance(project).log(MOEText.get(messagePrefix() + ".Finished.Successfully"));
-
-                    result.set(true);
-                    completed.up();
-                }
-
-                @Override
-                protected void cancel() {
-                    MOEToolWindow.getInstance(project).log(MOEText.get(messagePrefix() + ".Canceled"));
-
-                    result.set(false);
-                    completed.up();
-                }
-
-                @Override
-                protected void error(String error) {
-                    MOEToolWindow.getInstance(project).balloon(MessageType.ERROR, MOEText.get(messagePrefix() + ".Finished.Error"));
-                    MOEToolWindow.getInstance(project).log(MOEText.get(messagePrefix() + ".Finished.Error") + ": " + error);
-
-                    result.set(false);
-                    completed.up();
-                }
-            };
-
-            SwingUtilities.invokeAndWait(new Runnable() {
-                public void run() {
-                    if (ApplicationManager.getApplication().isDispatchThread()) {
-                        runner.queue();
-                    } else {
-                        UIUtil.invokeAndWaitIfNeeded(new Runnable() {
-                            public void run() {
-                                runner.queue();
-                            }
-                        });
-                    }
-                }
-            });
-
-            completed.waitFor();
-
-            for (String arg : argsToClean) {
-                PasswordEntry.clean(arg);
+            while (isOpenDialog) {
+                Thread.sleep(100);
             }
-            argsToClean.clear();
-        } catch (Exception e) {
-            return result.get();
-        }
 
-        return result.get();
-    }
+            // Start progress
+            ProgressIndicator progress = context.getProgressIndicator();
+            context.getProgressIndicator().pushState();
+            progress.setText("Building MOE application");
 
-    private boolean invokePostGradleCompileTasks(CompileContext compileContext) {
-
-        final AtomicBoolean result = new AtomicBoolean();
-
-        UIUtil.invokeAndWaitIfNeeded(new Runnable() {
-            public void run() {
-                MOEToolWindow.getInstance(project).showAndCreate(project);
+            if (canceled) {
+                toolWindow.balloon(MessageType.INFO, "BUILD CANCELED");
+                return true;
             }
-        });
 
-        try {
-            final Semaphore completed = new Semaphore();
-            completed.down();
+            final CompileThread compileThread = new CompileThread(runConfig, context);
+            compileThread.start();
 
-            final MOECompileTaskRunner runner = new MOECompileTaskRunner(project,
-                    MOEText.get("MOE.Build"),
-                    true,
-                    postGradleCompileTasks,
-                    compileContext) {
+            context.addMessage(CompilerMessageCategory.INFORMATION, "Building " + runConfig.moduleName(), null, -1, -1);
 
-                @Override
-                protected void success() {
-                    MOEToolWindow.getInstance(project).log(MOEText.get("Build.Finished.Successfully"));
+            // Wait for completion
+            while (compileThread.isAlive() && !progress.isCanceled()) {
+                compileThread.join(1000);
+            }
+            if (compileThread.isAlive() && progress.isCanceled()) {
+                compileThread.interrupt();
+                compileThread.join(1000);
+            }
 
-                    result.set(true);
-                    completed.up();
+            // Re-throw error
+            if (compileThread.throwable != null) {
+                throw compileThread.throwable;
+            }
+
+            // Show on failure
+            if (compileThread.returnCode != 0) {
+                if (!compileThread.canceled) {
+                    toolWindow.balloon(MessageType.ERROR, "BUILD FAILED");
+                    context.addMessage(CompilerMessageCategory.ERROR, "Multi-OS Engine module build failed", null, -1, -1, toolWindow.getNavigatable());
+                } else {
+                    toolWindow.balloon(MessageType.INFO, "BUILD CANCELED");
                 }
+                return false;
+            }
 
-                @Override
-                protected void cancel() {
-                    MOEToolWindow.getInstance(project).log(MOEText.get("Build.Canceled"));
-
-                    result.set(false);
-                    completed.up();
-                }
-
-                @Override
-                protected void error(String error) {
-                    MOEToolWindow.getInstance(project).balloon(MessageType.ERROR, MOEText.get("Build.Finished.Error"));
-                    MOEToolWindow.getInstance(project).log(MOEText.get("Build.Finished.Error") + ": " + error);
-
-                    result.set(false);
-                    completed.up();
-                }
-            };
-
-            SwingUtilities.invokeAndWait(new Runnable() {
-                public void run() {
-                    if (ApplicationManager.getApplication().isDispatchThread()) {
-                        runner.queue();
-                    } else {
-                        UIUtil.invokeAndWaitIfNeeded(new Runnable() {
-                            public void run() {
-                                runner.queue();
-                            }
-                        });
-                    }
-                }
-            });
-
-            completed.waitFor();
-
-        } catch (Exception e) {
-            return result.get();
+        } catch (Throwable t) {
+            toolWindow.balloon(MessageType.ERROR, "BUILD FAILED");
+            LOG.error("Failed to compile module", t);
+            context.addMessage(CompilerMessageCategory.ERROR, "Multi-OS Engine module build failed, an internal error occurred", null, -1, -1);
+            return false;
         } finally {
-            postGradleCompileTasks.clear();
+            context.getProgressIndicator().popState();
         }
-
-        return result.get();
+        return true;
     }
 
-    private String messagePrefix() {
-        if (postGradleCompileTasks.size() != 0) {
-            return "Gradle.Build";
-        }
-        return "Build";
-    }
+    private class CompileThread extends Thread {
+        private final MOERunConfiguration runConfig;
+        private final CompileContext compileContext;
+        private int returnCode = -1;
+        private OSProcessHandler handler;
+        private Throwable throwable;
+        private boolean canceled;
 
+        private CompileThread(MOERunConfiguration runConfig, CompileContext compileContext) {
+            if (runConfig == null) {
+                throw new NullPointerException();
+            }
+            if (compileContext == null) {
+                throw new NullPointerException();
+            }
+            this.runConfig = runConfig;
+            this.compileContext = compileContext;
+        }
+
+        @Override
+        public void run() {
+            try {
+                unsafeRun();
+            } catch (Throwable t) {
+                throwable = t;
+            }
+        }
+
+        private void unsafeRun() throws ExecutionException, IOException, InterruptedException {
+            // Configure Gradle
+            final MOEGradleRunner gradleRunner = new MOEGradleRunner(runConfig);
+            final boolean isDebug = runConfig.getActionType().equals("Debug");
+            final GeneralCommandLine commandLine = gradleRunner.construct(isDebug, false);
+            handler = new OSProcessHandler(commandLine);
+            handler.setShouldDestroyProcessRecursively(true);
+
+            // Configure output
+            final MOEToolWindow toolWindow = MOEToolWindow.getInstance(runConfig.getProject());
+            handler.addProcessListener(new ProcessAdapter() {
+                @Override
+                public void onTextAvailable(ProcessEvent event, Key outputType) {
+                    if (ProcessOutputTypes.STDERR.equals(outputType)) {
+                        toolWindow.error(event.getText());
+                    } else if (ProcessOutputTypes.STDOUT.equals(outputType)) {
+                        toolWindow.log(event.getText());
+                    } else {
+                        compileContext.addMessage(CompilerMessageCategory.INFORMATION, "MOE: " + event.getText(), null, -1, -1, toolWindow.getNavigatable());
+                    }
+                }
+            });
+            handler.startNotify();
+
+            // Start and wait
+            handler.waitFor();
+            returnCode = handler.getProcess().exitValue();
+        }
+
+        @Override
+        public void interrupt() {
+            canceled = true;
+            if (handler != null) {
+                handler.destroyProcess();
+                int timeout = 2000;
+                while (timeout > 0 && !handler.isProcessTerminated()) {
+                    timeout -= 100;
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException e) {
+                        break;
+                    }
+                }
+                if (handler.isProcessTerminated()) {
+                    return;
+                }
+            }
+            super.interrupt();
+        }
+    }
 }

@@ -24,8 +24,7 @@ import org.jetbrains.annotations.NotNull;
 public class MOEToolWindowFactory implements ToolWindowFactory {
     @Override
     public void createToolWindowContent(@NotNull Project project, @NotNull ToolWindow toolWindow) {
-        MOEToolWindow window = MOEToolWindow.getInstance(project);
+        final MOEToolWindow window = MOEToolWindow.getInstance(project);
         window.initToolWindow(toolWindow);
-        window.showAndCreate(project);
     }
 }

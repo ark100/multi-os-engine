@@ -16,21 +16,12 @@ limitations under the License.
 
 package org.moe.idea.runconfig;
 
-import org.moe.common.ios.Device;
-import org.moe.common.simulator.SimulatorManager;
-import org.moe.idea.MOESdkPlugin;
-import org.moe.idea.runconfig.configuration.MOERunConfigurationBase;
-import org.moe.idea.runconfig.configuration.local.MOERunConfigurationLocal;
-import org.moe.idea.runconfig.configuration.remote.MOERunConfigurationRemote;
-import org.moe.idea.runconfig.configuration.test.MOEJUnitUtil;
-import org.moe.idea.runconfig.configuration.test.MOETestListener;
-import org.moe.idea.runconfig.configuration.test.MOETestResultParser;
-import org.moe.idea.ui.MOEToolWindow;
 import com.intellij.execution.DefaultExecutionResult;
 import com.intellij.execution.ExecutionException;
 import com.intellij.execution.ExecutionResult;
 import com.intellij.execution.Executor;
 import com.intellij.execution.configurations.CommandLineState;
+import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.execution.filters.TextConsoleBuilder;
 import com.intellij.execution.filters.TextConsoleBuilderFactory;
 import com.intellij.execution.process.OSProcessHandler;
@@ -40,25 +31,28 @@ import com.intellij.execution.process.ProcessListener;
 import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.execution.runners.ProgramRunner;
 import com.intellij.execution.ui.ConsoleView;
-import com.intellij.openapi.module.ModuleManager;
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.MessageType;
 import com.intellij.openapi.util.Key;
 import org.jetbrains.annotations.NotNull;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import org.moe.common.junit.MOETestResultParser;
+import org.moe.idea.compiler.MOEGradleRunner;
+import org.moe.idea.execution.process.MOEOSProcessHandler;
+import org.moe.idea.runconfig.configuration.MOERunConfiguration;
+import org.moe.idea.runconfig.configuration.MOERunConfigurationBase;
+import org.moe.idea.runconfig.configuration.test.MOEJUnitUtil;
+import org.moe.idea.runconfig.configuration.test.MOETestListener;
+import org.moe.idea.ui.MOEToolWindow;
+import org.moe.idea.utils.logger.LoggerFactory;
 
 public class MOERunProfileState extends CommandLineState {
+    private static final Logger LOG = LoggerFactory.getLogger(MOERunProfileState.class);
 
-    private final MOERunConfigurationBase runConfiguration;
+    private final MOERunConfiguration runConfiguration;
     private Project project;
     private ProcessHandler processHandler;
-    private boolean needResultParser;
     private ConsoleView console;
-    String[] testArgs;
 
     public MOERunProfileState(Project project, ExecutionEnvironment environment) {
         super(environment);
@@ -67,8 +61,7 @@ public class MOERunProfileState extends CommandLineState {
             throw new RuntimeException("RunConfiguration can't be null.");
         }
 
-        this.runConfiguration = (MOERunConfigurationBase) getEnvironment().getRunnerAndConfigurationSettings().getConfiguration();
-
+        this.runConfiguration = (MOERunConfiguration) getEnvironment().getRunnerAndConfigurationSettings().getConfiguration();
         this.project = project;
 
         try {
@@ -78,150 +71,50 @@ public class MOERunProfileState extends CommandLineState {
                 this.console = getConsole(this, environment.getExecutor(), runConfiguration, project);
             }
         } catch (ExecutionException e) {
-
+            LOG.error(e.getMessage(), e);
         }
     }
 
     @NotNull
     @Override
     protected ProcessHandler startProcess() throws ExecutionException {
-
-        MOEToolWindow.getInstance(project).show();
-
         return createProcessHandler();
     }
 
     @NotNull
     private OSProcessHandler createProcessHandler() throws ExecutionException {
-
         if (runConfiguration.configuration() == null) {
             throw new ExecutionException("Invalid build configuration for " + runConfiguration.getClass().getName());
         } else if (runConfiguration.architecture() == null) {
             throw new ExecutionException("Invalid architecture for " + runConfiguration.getClass().getName());
         }
 
-        String appPath = MOESdkPlugin.getXcodeBuildAppPath(ModuleManager.getInstance(runConfiguration.getProject()).findModuleByName(runConfiguration.moduleName()),
-                runConfiguration.architecture(), runConfiguration.configuration(), runConfiguration.runJUnitTests());
-
-        int debugPort = 0;
-        int debugRemotePort = 0;
-        needResultParser = false;
-        testArgs = null;
-
-        if (runConfiguration.debug()) {
-            debugPort = runConfiguration.debugPort();
-            debugRemotePort = runConfiguration.debugRemotePort();
-        }
-
-        Process process = null;
-
-        List<String> args = new ArrayList<String>();
-        String deviceUdid = runConfiguration.deviceUdid();
-
-        boolean runOnSimulator = false;
-
-        if (runConfiguration instanceof MOERunConfigurationLocal) {
-            MOERunConfigurationLocal configurationLocal = (MOERunConfigurationLocal) runConfiguration;
-
-            if (configurationLocal.runOnSimulator()) {
-                runOnSimulator = true;
-                deviceUdid = configurationLocal.simulatorUdid();
-
-                if(debugPort > 0) {
-                    args.add("-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=" + Integer.toString(debugPort));
-                }
-            }
-
-            testArgs = configurationLocal.getTestArgs();
-
-            if (configurationLocal.runJUnitTests()) {
-
-                needResultParser = true;
-            }
-        }
-        else if (runConfiguration instanceof MOERunConfigurationRemote) {
-            File appDirectory = new File(appPath);
-
-            if (!appDirectory.isDirectory()) {
-                appPath = appPath.replace(runConfiguration.configuration() + "-iphoneos" + File.separator, "");
-            }
-
-            appDirectory = new File(appPath);
-
-            if (!appDirectory.isDirectory()) {
-                MOEToolWindow.getInstance(project).log("Unable to locate app directory at path: %s", appPath);
-                throw new ExecutionException("Unable to locate app directory at path for " + runConfiguration.getClass().getName());
-            }
-        }
-
-        if (runOnSimulator) {
-            SimulatorManager manager = new SimulatorManager();
-
-            if (testArgs != null) {
-                args.add("-args");
-                for (String arg : testArgs) {
-                    if (arg != null) {
-                        args.add(arg);
-                    }
-                }
-            }
-
-            try {
-                process = manager.installAndLaunchApp(deviceUdid, appPath, args);
-            }
-            catch (IOException e) {
-                throw new ExecutionException("Exec failure for configuration type " + runConfiguration.getClass().getName() + ". " + e.getMessage());
-            }
-        } else {
-            MOEToolWindow.getInstance(project).log("iOS Device: %s", deviceUdid);
-            MOEToolWindow.getInstance(project).log("Launching application: %s", appPath);
-
-            if (testArgs != null) {
-                args.add("-x=-args");
-                for (String arg : testArgs) {
-                    if (arg != null) {
-                        args.add("-x=" + arg);
-                    }
-                }
-            }
-
-            try {
-                process = Device.launchApp(deviceUdid, appPath, debugPort, debugRemotePort, args);
-            } catch (IOException e) {
-                throw new ExecutionException("Exec failure for configuration type " + runConfiguration.getClass().getName() + ". " + e.getMessage());
-            }
-        }
-
-        if (process == null) {
-            MOEToolWindow.getInstance(project).log("Can't detect run configuration type (unsupported)");
-            throw new ExecutionException("Can't detect run configuration type for " + runConfiguration.getClass().getName());
-        }
-
-        final MOEProcessHandler handler = new MOEProcessHandler(process, null);
-
+        final MOEGradleRunner gradleRunner = new MOEGradleRunner(runConfiguration);
+        final boolean isDebug = runConfiguration.getActionType().equals("Debug");
+        final GeneralCommandLine commandLine = gradleRunner.construct(isDebug, true);
+        final OSProcessHandler handler = new MOEOSProcessHandler(commandLine);
+        handler.setShouldDestroyProcessRecursively(true);
         final MOETestResultParser parser = new MOETestResultParser(new MOETestListener(this));
 
+        final boolean isTest = runConfiguration.runJUnitTests();
         handler.addProcessListener(new ProcessListener() {
             @Override
-            public void startNotified(ProcessEvent processEvent) {
-
+            public void startNotified(ProcessEvent event) {
             }
 
             @Override
-            public void processTerminated(ProcessEvent processEvent) {
-                MOEToolWindow.getInstance(project).log("Application process has been terminated.");
+            public void processTerminated(ProcessEvent event) {
             }
 
             @Override
-            public void processWillTerminate(ProcessEvent processEvent, boolean b) {
-                handler.getProcess().destroy();
+            public void processWillTerminate(ProcessEvent event, boolean willBeDestroyed) {
             }
 
             @Override
-            public void onTextAvailable(ProcessEvent processEvent, Key key) {
-                String text = processEvent.getText();
+            public void onTextAvailable(ProcessEvent event, Key outputType) {
+                String text = event.getText();
 
-                if (needResultParser) {
+                if (isTest) {
                     parser.addOutput(text);
                 }
 
@@ -249,7 +142,7 @@ public class MOERunProfileState extends CommandLineState {
         return processHandler;
     }
 
-    public MOERunConfigurationBase getConfiguration(){
+    public MOERunConfigurationBase getConfiguration() {
         return runConfiguration;
     }
 

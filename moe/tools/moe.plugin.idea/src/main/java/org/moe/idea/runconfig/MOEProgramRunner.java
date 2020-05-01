@@ -16,7 +16,6 @@ limitations under the License.
 
 package org.moe.idea.runconfig;
 
-import org.moe.idea.runconfig.configuration.MOERunConfigurationBase;
 import com.intellij.debugger.DebugEnvironment;
 import com.intellij.debugger.DebuggerManagerEx;
 import com.intellij.debugger.DefaultDebugUIEnvironment;
@@ -42,6 +41,8 @@ import com.intellij.xdebugger.XDebuggerManager;
 import com.intellij.xdebugger.impl.XDebugSessionImpl;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.moe.idea.runconfig.configuration.MOERunConfiguration;
+import org.moe.idea.runconfig.configuration.MOERunConfigurationBase;
 
 public class MOEProgramRunner extends GenericProgramRunner {
     private static final String DEBUG = "Debug";
@@ -74,8 +75,11 @@ public class MOEProgramRunner extends GenericProgramRunner {
     @Nullable
     @Override
     protected RunContentDescriptor doExecute(@NotNull RunProfileState state, @NotNull ExecutionEnvironment environment) throws ExecutionException {
+        MOERunConfiguration runConfig = (MOERunConfiguration)environment.getRunProfile();
+        if (runConfig.isCanceled()) {
+            return null;
+        }
         if(isDebugExecutor(environment.getExecutor())) {
-            MOERunConfigurationBase runConfig = (MOERunConfigurationBase)environment.getRunProfile();
 
             RemoteConnection connection = new RemoteConnection(true, "localhost", Integer.toString(runConfig.debugPort()), false);
 

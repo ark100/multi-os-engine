@@ -21,16 +21,21 @@ import com.intellij.ide.util.projectWizard.WizardContext;
 import com.intellij.platform.ProjectTemplate;
 import com.intellij.platform.ProjectTemplatesFactory;
 import org.jetbrains.annotations.NotNull;
+import org.moe.generator.project.MOEProjectComposer.Template;
 import res.MOEIcons;
 import res.MOEText;
 
 import javax.swing.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 
 public class MOEProjectTemplatesFactory extends ProjectTemplatesFactory {
     @NotNull
     @Override
     public String[] getGroups() {
-        return new String[] {  MOEText.get("MOE") };
+        return new String[] { MOEText.get("MOE") };
     }
 
     @Override
@@ -50,44 +55,19 @@ public class MOEProjectTemplatesFactory extends ProjectTemplatesFactory {
 
     @NotNull
     @Override
-    public ProjectTemplate[] createTemplates(String s, WizardContext wizardContext) {
-
-        return new ProjectTemplate[] {
-
-                new MOEProjectTemplate(MOEText.get("MasterDetailStoryboard.Application"),
-                        MOEText.get("MasterDetail.Application.Description"),
-                        MOEProjectTemplate.MOETemplateType.MasterDetail,
-                        new MOEModuleBuilder()),
-
-                new MOEProjectTemplate(MOEText.get("PageBased.Application"),
-                        MOEText.get("PageBased.Application.Description"),
-                        MOEProjectTemplate.MOETemplateType.PageBased,
-                        new MOEModuleBuilder()),
-
-                new MOEProjectTemplate(MOEText.get("PageBasedStoryboard.Application"),
-                        MOEText.get("PageBased.Application.Description"),
-                        MOEProjectTemplate.MOETemplateType.PageBasedStoryboard,
-                        new MOEModuleBuilder()),
-
-                new MOEProjectTemplate(MOEText.get("SingleView.Application"),
-                        MOEText.get("SingleView.Application.Description"),
-                        MOEProjectTemplate.MOETemplateType.SingleView,
-                        new MOEModuleBuilder()),
-
-                new MOEProjectTemplate(MOEText.get("SingleViewStoryboard.Application"),
-                        MOEText.get("SingleView.Application.Description"),
-                        MOEProjectTemplate.MOETemplateType.SingleViewStoryboard,
-                        new MOEModuleBuilder()),
-
-                new MOEProjectTemplate(MOEText.get("Tabbed.Application"),
-                        MOEText.get("Tabbed.Application.Description"),
-                        MOEProjectTemplate.MOETemplateType.Tabbed,
-                        new MOEModuleBuilder()),
-
-                new MOEProjectTemplate(MOEText.get("Game.Application"),
-                        MOEText.get("Game.Application.Description"),
-                        MOEProjectTemplate.MOETemplateType.Game,
-                        new MOEModuleBuilder())
-        };
+    public ProjectTemplate[] createTemplates(String group, WizardContext wizardContext) {
+        final List<MOEProjectTemplate> templates = new ArrayList<MOEProjectTemplate>();
+        for (Template template : Template.values()) {
+            final MOEProjectTemplate projectTemplate = new MOEProjectTemplate(
+                    template.language + " > " + template.description, "", template, new MOEModuleBuilder());
+            templates.add(projectTemplate);
+        }
+        Collections.sort(templates, new Comparator<MOEProjectTemplate>() {
+            @Override
+            public int compare(MOEProjectTemplate o1, MOEProjectTemplate o2) {
+                return o1.getName().compareTo(o2.getName());
+            }
+        });
+        return templates.toArray(new ProjectTemplate[templates.size()]);
     }
 }

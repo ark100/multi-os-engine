@@ -16,22 +16,30 @@ limitations under the License.
 
 package org.moe.idea.component;
 
-import org.moe.idea.MOESdkPlugin;
-import org.moe.idea.utils.XCodeProjectSyncListener;
-import org.moe.idea.compiler.MOECompileTask;
-import org.moe.idea.utils.FileEditorListener;
-import org.moe.idea.utils.ModuleUtils;
+import com.intellij.ProjectTopics;
+import com.intellij.compiler.CompilerManagerImpl;
+import com.intellij.execution.RunManager;
+import com.intellij.execution.impl.RunManagerImpl;
+import com.intellij.openapi.compiler.CompileContext;
 import com.intellij.openapi.compiler.CompileTask;
 import com.intellij.openapi.compiler.CompilerManager;
 import com.intellij.openapi.components.AbstractProjectComponent;
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleManager;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.util.messages.MessageBusConnection;
+import org.moe.idea.MOESdkPlugin;
+import org.moe.idea.compiler.MOECompileTask;
+import org.moe.idea.utils.FileEditorListener;
+import org.moe.idea.utils.ModuleObserver;
+import org.moe.idea.utils.logger.LoggerFactory;
 
 public class MOEProjectComponent extends AbstractProjectComponent {
+
+    private static final Logger LOG = LoggerFactory.getLogger(MOEProjectComponent.class);
+
     private MessageBusConnection messageBusConnection;
 
     protected MOEProjectComponent(Project project) {
@@ -42,11 +50,8 @@ public class MOEProjectComponent extends AbstractProjectComponent {
     public void initComponent() {
         super.initComponent();
         messageBusConnection = myProject.getMessageBus().connect();
-
-        messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, new XCodeProjectSyncListener(myProject));
-
         messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, new FileEditorListener());
-
+        messageBusConnection.subscribe(ProjectTopics.MODULES, new ModuleObserver());
     }
 
     @Override
@@ -54,37 +59,20 @@ public class MOEProjectComponent extends AbstractProjectComponent {
         if(messageBusConnection != null) {
             messageBusConnection.disconnect();
         }
-
         messageBusConnection = null;
-
         super.disposeComponent();
     }
 
     @Override
     public void projectOpened() {
-        boolean found = false;
-
-        CompilerManager compilerManager = CompilerManager.getInstance(myProject);
-
-        for (CompileTask task : compilerManager.getAfterTasks()) {
-            if (task instanceof MOECompileTask) {
-                found = true;
-                break;
-            }
-        }
-
-        if (!found) {
-            CompilerManager.getInstance(myProject).addAfterTask(new MOECompileTask());
-        }
-
+        // Find MOE modules
         for (Module module : ModuleManager.getInstance(myProject).getModules()) {
             if (MOESdkPlugin.isValidMoeModule(module)) {
                 if (module.getModuleFile() == null){
                     module.getProject().save();
                 }
-                ModuleUtils.updateXcodeProjectPath(module);
-                ModuleUtils.updateProductName(module);
             }
         }
     }
+
 }

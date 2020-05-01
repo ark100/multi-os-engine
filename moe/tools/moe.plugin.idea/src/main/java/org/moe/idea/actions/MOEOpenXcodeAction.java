@@ -16,21 +16,24 @@ limitations under the License.
 
 package org.moe.idea.actions;
 
-import org.moe.common.exec.SimpleExec;
-import org.moe.common.utils.OsUtils;
-import org.moe.idea.MOESdkPlugin;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
+import com.intellij.openapi.actionSystem.DataContext;
+import com.intellij.openapi.actionSystem.LangDataKeys;
 import com.intellij.openapi.actionSystem.Presentation;
 import com.intellij.openapi.module.Module;
-import com.intellij.openapi.module.ModuleManager;
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.roots.ModuleRootManager;
+import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.vfs.VirtualFile;
+import org.moe.common.developer.NativeSDKUtil;
+import org.moe.common.utils.OsUtils;
+import org.moe.common.utils.ProjectUtil;
+import org.moe.idea.MOESdkPlugin;
+import org.moe.idea.utils.ModuleUtils;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Properties;
 
 public class MOEOpenXcodeAction extends AnAction {
     private Module module;
@@ -41,16 +44,42 @@ public class MOEOpenXcodeAction extends AnAction {
             return;
         }
 
-        File project = MOESdkPlugin.getXcodeProjectFile(module);
-        if ((project == null) || !project.exists()) {
+        final File modulePath = new File(ModuleUtils.getModulePath(module));
+        final Properties properties = ProjectUtil
+                .retrievePropertiesFromGradle(modulePath, ProjectUtil.XCODE_PROPERTIES_TASK);
+
+        // Try to open workspace
+        final String ws = properties.getProperty(ProjectUtil.XCODE_WORKSPACE_KEY);
+        if (ws != null) {
+            final File file = new File(ws);
+            if (!file.exists()) {
+                Messages.showErrorDialog("Xcode workspace does not exist", "Open Xcode Project");
+            }
+            try {
+                NativeSDKUtil.openWithXcode(file.getAbsolutePath());
+            } catch (IOException ignored) {
+                System.out.println("Could not open workspace " + file.getAbsolutePath() + "\n" + ignored.getMessage());
+            }
             return;
         }
 
-        try {
-            SimpleExec.getOpen("xcode", project.getAbsolutePath()).getRunner().run(null);
-        } catch (IOException ignored) {
-            System.out.println("Could not open project " + project.getAbsolutePath() + "\n" + ignored.getMessage());
+        // Try to open project
+        final String pr = properties.getProperty(ProjectUtil.XCODE_PROJECT_KEY);
+        if (pr != null) {
+            final File file = new File(pr);
+            if (!file.exists()) {
+                Messages.showErrorDialog("Xcode project does not exist", "Open Xcode Project");
+            }
+            try {
+                NativeSDKUtil.openWithXcode(file.getAbsolutePath());
+            } catch (IOException ignored) {
+                System.out.println("Could not open project " + file.getAbsolutePath() + "\n" + ignored.getMessage());
+            }
+            return;
         }
+
+        Messages.showErrorDialog("Neither the Xcode project nor the workspace is set in the Gradle plugin",
+                "Open Xcode Project");
     }
 
     @Override
@@ -73,22 +102,12 @@ public class MOEOpenXcodeAction extends AnAction {
             return;
         }
 
-        Project project = e.getProject();
-
-        if(project == null) {
-            return;
-        }
-
-        for(Module module : ModuleManager.getInstance(project).getModules()) {
-            if(ModuleRootManager.getInstance(module).getFileIndex().isInContent(file)) {
-                this.module = module;
-            }
-        }
+        DataContext dataContext = e.getDataContext();
+        module = (Module) dataContext.getData(LangDataKeys.MODULE.getName());
 
         boolean enabled = false;
         if ((module != null) && MOESdkPlugin.isValidMoeModule(module)) {
-            File xcodeFile = MOESdkPlugin.getXcodeProjectFile(module);
-            enabled = ((xcodeFile != null) && xcodeFile.exists());
+            enabled = true;
         }
 
         presentation.setEnabled(enabled);
