@@ -36,6 +36,9 @@ import org.eclipse.debug.core.model.IStreamMonitor;
 import org.eclipse.debug.core.model.IStreamsProxy;
 import org.eclipse.jdt.launching.IVMConnector;
 import org.eclipse.jdt.launching.JavaRuntime;
+import org.eclipse.ui.console.MessageConsole;
+import org.eclipse.ui.console.MessageConsoleStream;
+import org.moe.common.junit.MOETestResultParser;
 import org.moe.utils.logger.LoggerFactory;
 
 public class Launcher implements IProcess {
@@ -50,6 +53,7 @@ public class Launcher implements IProcess {
 	private boolean isDebug;
 	private Map<String, String> vmArgs;
 	private IProgressMonitor progressMonitor;
+	private MOETestResultParser testResultParser;
 
 	public Launcher(ILaunch launch, Process process, Map<String, String> vmArgs, IProgressMonitor progressMonitor) {
 		this.mLaunch = launch;
@@ -82,12 +86,13 @@ public class Launcher implements IProcess {
 
 	@Override
 	public void terminate() throws DebugException {
+		sendEvent(new DebugEvent(this, DebugEvent.TERMINATE));
+		mLaunch.removeProcess(this);
 		outputStreamMonitor.stop();
 		errorStreamMonitor.stop();
 		if (mProcess.isAlive()) {
 			mProcess.destroy();
 		}
-		sendEvent(new DebugEvent(this, DebugEvent.TERMINATE));
 	}
 
 	@Override
@@ -112,7 +117,7 @@ public class Launcher implements IProcess {
 
 	@Override
 	public IStreamsProxy getStreamsProxy() {
-		// TODO Auto-generated method stub
+
 		return new IStreamsProxy() {
 
 			@Override
@@ -140,15 +145,13 @@ public class Launcher implements IProcess {
 	private void sendEvent(DebugEvent event) {
 		DebugPlugin manager = DebugPlugin.getDefault();
 		if (manager != null) {
-			manager.fireDebugEventSet(new DebugEvent[] {
-					event
-			});
+			manager.fireDebugEventSet(new DebugEvent[] { event });
 		}
 	}
 
 	public void start() {
-		mLaunch.addProcess(this);
 		sendEvent(new DebugEvent(this, DebugEvent.CREATE));
+		mLaunch.addProcess(this);
 		ProcessHandler processHandler = new ProcessHandler();
 		processHandler.start();
 		if (isDebug) {
@@ -167,9 +170,13 @@ public class Launcher implements IProcess {
 		private Object lock = new Object();
 		private StringBuffer stringBuffer = new StringBuffer();
 		private boolean stopped = false;
+		private MessageConsoleStream consoleStream;
 
 		public StreamMonitor(InputStream in) {
 			this.mInputStream = in;
+			MessageConsole console = MOEProjectBuildConsole.getLaunchConsole();
+			console.clearConsole();
+			this.consoleStream = console.newMessageStream();
 
 			new Thread(new Runnable() {
 
@@ -184,8 +191,12 @@ public class Launcher implements IProcess {
 									int size = mInputStream.read(buffer);
 									String content = new String(buffer, 0, size, "UTF-8");
 									stringBuffer.append(content);
+									consoleStream.println(content);
 									for (IStreamListener listener : listeners) {
 										listener.streamAppended(content, StreamMonitor.this);
+									}
+									if (testResultParser != null) {
+										testResultParser.addOutput(content);
 									}
 								}
 							} catch (IOException e) {
@@ -239,8 +250,7 @@ public class Launcher implements IProcess {
 				public void run() {
 					try {
 						int result = mProcess.waitFor();
-						if (result != 0) {
-						}
+						LOG.debug("Launch exit code: " + result);
 						try {
 							terminate();
 						} catch (DebugException e) {
@@ -281,6 +291,10 @@ public class Launcher implements IProcess {
 		if (exception != null) {
 			throw new CoreException(exception.getStatus());
 		}
+	}
+
+	public void setTestResultParser(MOETestResultParser testResultParser) {
+		this.testResultParser = testResultParser;
 	}
 
 }

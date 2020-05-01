@@ -1,6 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?eclipse version="3.4"?>
 <plugin>
+   <extension
+         point="org.eclipse.m2e.core.projectConfigurators">
+      <configurator
+            class="org.moe.internal.MOEProjectConfigurator"
+            id="org.moe.MOEConfigurator"
+            name="MOE Project Configurator">
+      </configurator>
+   </extension>
+   <extension
+         point="org.eclipse.m2e.core.lifecycleMappingMetadataSource">
+   </extension>
     <extension
             point="org.eclipse.ui.startup">
         <startup
@@ -8,7 +19,7 @@
         </startup>
     </extension>
     <extension
-            id="org.moe.natures.project"
+            id="org.multi-os-engine.project"
             name="MOEProjectNature"
             point="org.eclipse.core.resources.natures">
         <runtime>
@@ -58,10 +69,180 @@
     <extension
             point="org.eclipse.debug.ui.launchShortcuts">
         <shortcut
-                class="org.moe.runconfig.LocalLaunchShortcut"
+                class="org.moe.runconfig.DeviceLaunchShortcut"
                 icon="icons/moe_small.png"
-                id="org.moe.runconfig.LocalLaunchShortcut"
-                label="Multi-OS Engine iOS Application"
+                id="org.moe.runconfig.DeviceLaunchShortcut"
+                label="Multi-OS Engine iOS Application (Device)"
+                modes="run,debug">
+            <contextualLaunch>
+                <enablement>
+                    <with variable="selection">
+                        <count value="1"/>
+                        <iterate>
+                            <and>
+                                <test property="org.eclipse.jdt.launching.isContainer"/>
+                                <reference definitionId="org.moe.isRelevantProjectAndMac"/>
+                            </and>
+                        </iterate>
+                    </with>
+                </enablement>
+            </contextualLaunch>
+            <configurationType
+                    id="org.moe.runconfig.LocalConfigurationDelegate">
+            </configurationType>
+            <description
+                    description="Multi-OS Engine build"
+                    mode="run">
+            </description>
+            <description
+                    description="Multi-OS Engine build"
+                    mode="debug">
+            </description>
+        </shortcut>
+    </extension>
+    <extension
+            point="org.eclipse.debug.ui.launchShortcuts">
+        <shortcut
+                class="org.moe.runconfig.SimulatorIPhoneLaunchShortcut"
+                icon="icons/moe_small.png"
+                id="org.moe.runconfig.SimulatorIPhoneLaunchShortcut"
+                label="Multi-OS Engine iOS Application Simulator (iPhone)"
+                modes="run,debug">
+            <contextualLaunch>
+                <enablement>
+                    <with variable="selection">
+                        <count value="1"/>
+                        <iterate>
+                            <and>
+                                <test property="org.eclipse.jdt.launching.isContainer"/>
+                                <reference definitionId="org.moe.isRelevantProjectAndMac"/>
+                            </and>
+                        </iterate>
+                    </with>
+                </enablement>
+            </contextualLaunch>
+            <configurationType
+                    id="org.moe.runconfig.LocalConfigurationDelegate">
+            </configurationType>
+            <description
+                    description="Multi-OS Engine build"
+                    mode="run">
+            </description>
+            <description
+                    description="Multi-OS Engine build"
+                    mode="debug">
+            </description>
+        </shortcut>
+    </extension>
+    <extension
+            point="org.eclipse.debug.ui.launchShortcuts">
+        <shortcut
+                class="org.moe.runconfig.SimulatorIPadLaunchShortcut"
+                icon="icons/moe_small.png"
+                id="org.moe.runconfig.SimulatorIPadLaunchShortcut"
+                label="Multi-OS Engine iOS Application Simulator (iPad)"
+                modes="run,debug">
+            <contextualLaunch>
+                <enablement>
+                    <with variable="selection">
+                        <count value="1"/>
+                        <iterate>
+                            <and>
+                                <test property="org.eclipse.jdt.launching.isContainer"/>
+                                <reference definitionId="org.moe.isRelevantProjectAndMac"/>
+                            </and>
+                        </iterate>
+                    </with>
+                </enablement>
+            </contextualLaunch>
+            <configurationType
+                    id="org.moe.runconfig.LocalConfigurationDelegate">
+            </configurationType>
+            <description
+                    description="Multi-OS Engine build"
+                    mode="run">
+            </description>
+            <description
+                    description="Multi-OS Engine build"
+                    mode="debug">
+            </description>
+        </shortcut>
+    </extension>
+    <extension
+            point="org.eclipse.debug.ui.launchShortcuts">
+        <shortcut
+                class="org.moe.runconfig.JUnitDeviceLaunchShortcut"
+                icon="icons/moe_small.png"
+                id="org.moe.runconfig.JUnitDeviceLaunchShortcut"
+                label="Multi-OS Engine JUnit Test (Device)"
+                modes="run,debug">
+            <contextualLaunch>
+                <enablement>
+                    <with variable="selection">
+                        <count value="1"/>
+                        <iterate>
+                            <and>
+                                <test property="org.eclipse.jdt.launching.isContainer"/>
+                                <reference definitionId="org.moe.isRelevantProjectAndMac"/>
+                            </and>
+                        </iterate>
+                    </with>
+                </enablement>
+            </contextualLaunch>
+            <configurationType
+                    id="org.moe.runconfig.LocalConfigurationDelegate">
+            </configurationType>
+            <description
+                    description="Multi-OS Engine build"
+                    mode="run">
+            </description>
+            <description
+                    description="Multi-OS Engine build"
+                    mode="debug">
+            </description>
+        </shortcut>
+    </extension>
+    <extension
+            point="org.eclipse.debug.ui.launchShortcuts">
+        <shortcut
+                class="org.moe.runconfig.JUnitSimulatorIPhoneLaunchShortcut"
+                icon="icons/moe_small.png"
+                id="org.moe.runconfig.JUnitSimulatorIPhoneLaunchShortcut"
+                label="Multi-OS Engine JUnit Test (iPhone)"
+                modes="run,debug">
+            <contextualLaunch>
+                <enablement>
+                    <with variable="selection">
+                        <count value="1"/>
+                        <iterate>
+                            <and>
+                                <test property="org.eclipse.jdt.launching.isContainer"/>
+                                <reference definitionId="org.moe.isRelevantProjectAndMac"/>
+                            </and>
+                        </iterate>
+                    </with>
+                </enablement>
+            </contextualLaunch>
+            <configurationType
+                    id="org.moe.runconfig.LocalConfigurationDelegate">
+            </configurationType>
+            <description
+                    description="Multi-OS Engine build"
+                    mode="run">
+            </description>
+            <description
+                    description="Multi-OS Engine build"
+                    mode="debug">
+            </description>
+        </shortcut>
+    </extension>
+    <extension
+            point="org.eclipse.debug.ui.launchShortcuts">
+        <shortcut
+                class="org.moe.runconfig.JUnitSimulatorIPadLaunchShortcut"
+                icon="icons/moe_small.png"
+                id="org.moe.runconfig.JUnitSimulatorIPadLaunchShortcut"
+                label="Multi-OS Engine JUnit Test (iPad)"
                 modes="run,debug">
             <contextualLaunch>
                 <enablement>
@@ -96,87 +277,75 @@
                 name="Multi-OS Engine">
         </category>
         <wizard
+                class="org.moe.wizards.MasterDetailProjectWizard"
+                id="org.moe.wizards.MasterDetailProjectWizard"
+                name="Java Master-Detail Application"
+                category="moe.project.Category"
+                icon="icons/moe_small.png"
+                project="true"
+                finalPerspective="org.eclipse.jdt.ui.JavaPerspective">
+            <description>
+                Master-Detail application Java project template.
+            </description>
+        </wizard>
+        <wizard
                 class="org.moe.wizards.SingleViewProjectWizard"
                 id="org.moe.wizards.SingleViewProjectWizard"
-                name="Single View Application"
+                name="Java Single View Application"
                 category="moe.project.Category"
                 icon="icons/moe_small.png"
                 project="true"
                 finalPerspective="org.eclipse.jdt.ui.JavaPerspective">
             <description>
-                Create Single View Application project into the workspace.
-            </description>
-        </wizard>
-        <wizard
-                class="org.moe.wizards.SingleViewStoryboardProjectWizard"
-                id="org.moe.wizards.SingleViewStoryboardProjectWizard"
-                name="Single View Application with Storyboard"
-                category="moe.project.Category"
-                icon="icons/moe_small.png"
-                project="true"
-                finalPerspective="org.eclipse.jdt.ui.JavaPerspective">
-            <description>
-                Create Single View Application with Storyboard project into the workspace.
-            </description>
-        </wizard>
-        <wizard
-                class="org.moe.wizards.PageBasedProjectWizard"
-                id="org.moe.wizards.PageBasedProjectWizard"
-                name="Page-Based Application"
-                category="moe.project.Category"
-                icon="icons/moe_small.png"
-                project="true"
-                finalPerspective="org.eclipse.jdt.ui.JavaPerspective">
-            <description>
-                Create Page-Based Application project into the workspace.
-            </description>
-        </wizard>
-        <wizard
-                class="org.moe.wizards.PageBasedStoryboardProjectWizard"
-                id="org.moe.wizards.PageBasedStoryboardProjectWizard"
-                name="Page-Based Application with Storyboard"
-                category="moe.project.Category"
-                icon="icons/moe_small.png"
-                project="true"
-                finalPerspective="org.eclipse.jdt.ui.JavaPerspective">
-            <description>
-                Create Page-Based Application with Storyboard project into the workspace.
+                Single view application Java project template.
             </description>
         </wizard>
         <wizard
                 class="org.moe.wizards.GameProjectWizard"
                 id="org.moe.wizards.GameProjectWizard"
-                name="Game"
+                name="Java OpenGL ES Game"
                 category="moe.project.Category"
                 icon="icons/moe_small.png"
                 project="true"
                 finalPerspective="org.eclipse.jdt.ui.JavaPerspective">
             <description>
-                Create Game project into the workspace.
+                OpenGL ES Game Java project template.
             </description>
         </wizard>
         <wizard
-                class="org.moe.wizards.MasterDetailProjectWizard"
-                id="org.moe.wizards.MasterDetailProjectWizard"
-                name="Master-Detail Application with Storyboard"
-                category="org.project.Category"
-                icon="icons/moe_small.png"
-                project="true"
-                finalPerspective="org.eclipse.jdt.ui.JavaPerspective">
-            <description>
-                Create Master-Detail Application with Storyboard project into the workspace.
-            </description>
-        </wizard>
-        <wizard
-                class="org.moe.wizards.TabbedProjectWizard"
-                id="org.moe.wizards.TabbedProjectWizard"
-                name="Tabbed Application"
+                class="org.moe.wizards.KotlinMasterDetailProjectWizard"
+                id="org.moe.wizards.KotlinMasterDetailProjectWizard"
+                name="Kotlin Master-Detail Application"
                 category="moe.project.Category"
                 icon="icons/moe_small.png"
                 project="true"
                 finalPerspective="org.eclipse.jdt.ui.JavaPerspective">
             <description>
-                Create Tabbed Application project into the workspace.
+                Master-Detail application Kotlin project template.
+            </description>
+        </wizard>
+        <wizard
+                class="org.moe.wizards.KotlinSingleViewProjectWizard"
+                id="org.moe.wizards.KotlinSingleViewProjectWizard"
+                name="Kotlin Single View Application"
+                category="moe.project.Category"
+                icon="icons/moe_small.png"
+                project="true"
+                finalPerspective="org.eclipse.jdt.ui.JavaPerspective">
+            <description>
+                Single view application Kotlin project template.
+            </description>
+        </wizard>
+        <wizard
+                class="org.moe.wizards.KotlinGameProjectWizard"
+                id="org.moe.wizards.KotlinGameProjectWizard"
+                name="Kotlin OpenGL ES Game"
+                category="moe.project.Category"
+                icon="icons/moe_small.png"
+                project="true"
+                finalPerspective="org.eclipse.jdt.ui.JavaPerspective">
+            <description>
+                OpenGL ES Game Kotlin project template.
             </description>
         </wizard>
     </extension>
@@ -184,9 +353,15 @@
             point="org.eclipse.ui.commands">
         <command
                 categoryId="org.eclipse.ui.commands"
-                defaultHandler="org.moe.popup.actions.SynchronizeToJavaHandler"
-                id="org.moe.popup.actions.SynchronizeToJavaHandler"
-                name="Synchronize to Java">
+                defaultHandler="org.moe.popup.actions.GenerateActionsAndOutletsActionHandler"
+                id="org.moe.popup.actions.GenerateActionsAndOutletsActionHandler"
+                name="Generate Actions and Outlets for Interface Builder">
+        </command>
+        <command
+                categoryId="org.eclipse.ui.commands"
+                defaultHandler="org.moe.popup.actions.RefreshXcodeProjectActionHandler"
+                id="org.moe.popup.actions.RefreshXcodeProjectActionHandler"
+                name="Inject/Refresh Xcode Project Settings">
         </command>
         <command
                 categoryId="org.eclipse.ui.commands"
@@ -196,9 +371,15 @@
         </command>
         <command
                 categoryId="org.eclipse.ui.commands"
-                defaultHandler="org.moe.popup.actions.LinkThirdpartyFrameworkActionHandler"
-                id="org.moe.popup.actions.LinkThirdpartyFrameworkActionHandler"
-                name="Link third party framework to Xcode">
+                defaultHandler="org.moe.popup.actions.OpenXcodeEditorActionHandler"
+                id="org.moe.popup.actions.OpenXcodeEditorActionHandler"
+                name="Open Xcode Editor">
+        </command>
+        <command
+                categoryId="org.eclipse.ui.commands"
+                defaultHandler="org.moe.popup.actions.NewBindingActionHandler"
+                id="org.moe.popup.actions.NewBindingActionHandler"
+                name="Create New Binding Configuration">
         </command>
     </extension>
     <extension
@@ -206,12 +387,20 @@
         <menuContribution
                 locationURI="popup:org.eclipse.ui.popup.any">
             <menu label="Multi-OS Engine Actions">
-                <command
-                        commandId="org.moe.popup.actions.SynchronizeToJavaHandler"
-                        label="Synchronize to Java"
+            	<command
+                        commandId="org.moe.popup.actions.GenerateActionsAndOutletsActionHandler"
+                        label="Generate Actions and Outlets for Interface Builder"
                         style="push">
                     <visibleWhen>
-                        <reference definitionId="org.moe.isRelevantProjectAndMac"/>
+                        <reference definitionId="org.moe.isRelevantProject"/>
+                    </visibleWhen>
+                </command>
+                <command
+                        commandId="org.moe.popup.actions.RefreshXcodeProjectActionHandler"
+                        label="Inject/Refresh Xcode Project Settings"
+                        style="push">
+                    <visibleWhen>
+                        <reference definitionId="org.moe.isRelevantProject"/>
                     </visibleWhen>
                 </command>
                 <command
@@ -223,8 +412,16 @@
                     </visibleWhen>
                 </command>
                 <command
-                        commandId="org.moe.popup.actions.LinkThirdpartyFrameworkActionHandler"
-                        label="Link third party framework to Xcode"
+                        commandId="org.moe.popup.actions.OpenXcodeEditorActionHandler"
+                        label="Open Xcode Editor"
+                        style="push">
+                    <visibleWhen>
+                        <reference definitionId="org.moe.isRelevantProject"/>
+                    </visibleWhen>
+                </command>
+                <command
+                        commandId="org.moe.popup.actions.NewBindingActionHandler"
+                        label="Create New Binding Configuration"
                         style="push">
                     <visibleWhen>
                         <reference definitionId="org.moe.isRelevantProjectAndMac"/>
@@ -259,5 +456,41 @@
                 </iterate>
             </with>
         </definition>
+    </extension>
+    <extension
+          point="org.eclipse.ui.preferencePages">
+       <page
+             class="org.moe.preferences.MOEPreferencePage"
+             id="org.moe.preferences.MOEPreferencePage"
+             name="Multi-OS Engine Preferences">
+       </page>
+    </extension>
+    <extension
+          point="org.eclipse.core.runtime.preferences">
+       <initializer
+             class="org.moe.preferences.PreferenceInitializer">
+       </initializer>
+    </extension>
+    <extension
+          point="org.eclipse.core.runtime.preferences">
+    </extension>
+    <extension
+          point="org.eclipse.ui.editors">
+       <editor
+             class="org.moe.editors.XCodeEditor"
+             contributorClass="org.eclipse.ui.texteditor.BasicTextEditorActionContributor"
+             extensions="pbxproj"
+             icon="icons/moe_small.png"
+             id="org.moe.editors.XCodeEditor"
+             name="XCode Editor">
+       </editor>
+       <editor
+             class="org.moe.editors.BindingEditor"
+             contributorClass="org.eclipse.ui.texteditor.BasicTextEditorActionContributor"
+             extensions="nbc"
+             icon="icons/moe_small.png"
+             id="org.moe.editors.BindingEditor"
+             name="Binding Editor">
+       </editor>
     </extension>
 </plugin>

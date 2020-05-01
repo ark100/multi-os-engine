@@ -16,40 +16,34 @@
 
 package org.moe.wizards;
 
-import java.util.regex.Pattern;
-
-import org.eclipse.core.resources.IWorkspace;
-import org.eclipse.core.resources.ResourcesPlugin;
-import org.eclipse.core.runtime.IPath;
 import org.eclipse.jface.wizard.IWizardPage;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
-import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
-import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Group;
 import org.eclipse.swt.widgets.Label;
-import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Text;
+import org.moe.generator.project.MOEProjectComposer;
+
+import static org.moe.generator.project.MOEProjectComposer.Field.*;
 
 public class XcodeWizardPage extends AbstractWizardPage {
+	
+	private final static String BUNDLE_ID = "Application Bundle Id: ";
 
-	private Text xcodeProjectNameText;
-	private Text productNameText;
+	private Text projectNameText;
 	private Text organizationNameText;
 	private Text companyIdentifierText;
-	private Button keepXcodeButton;
-	private Label xcodePathLabel;
-	private Text xcodePathText;
-	private Group xcodePathGroup;
-
-	private Pattern validJavaPackagePattern = Pattern.compile("^[a-zA-Z_\\$][\\w\\$]*(?:\\.[a-zA-Z_\\$][\\w\\$]*)*$");
+	private Text packageNameText;
+	private Label bundleIdentifier;
+	private MOEProjectComposer projectComposer;
 
 	protected XcodeWizardPage(String pageName) {
 		super(pageName);
+		this.projectComposer = new MOEProjectComposer();
 	}
 
 	@Override
@@ -64,7 +58,7 @@ public class XcodeWizardPage extends AbstractWizardPage {
 
 		Group projectGroup = new Group(parent, SWT.NONE);
 		projectGroup.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
-		projectGroup.setText("Xcode Project");
+		projectGroup.setText("Project");
 		GridLayout projectLayout = new GridLayout();
 		projectLayout.numColumns = 1;
 		projectGroup.setLayout(projectLayout);
@@ -75,49 +69,35 @@ public class XcodeWizardPage extends AbstractWizardPage {
 		projectNameLayout.numColumns = 2;
 		projectNameGroup.setLayout(projectNameLayout);
 
-		Label sdkLabel = new Label(projectNameGroup, SWT.NONE);
-		sdkLabel.setText("Xcode Project Name:");
+		Label projectNameLabel = new Label(projectNameGroup, SWT.NONE);
+		projectNameLabel.setText("Project Name:");
 
-		xcodeProjectNameText = new Text(projectNameGroup, SWT.SINGLE | SWT.BORDER);
-		xcodeProjectNameText.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
-		xcodeProjectNameText.addModifyListener(new ModifyListener() {
+		projectNameText = new Text(projectNameGroup, SWT.SINGLE | SWT.BORDER);
+		projectNameText.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+		projectNameText.addModifyListener(new ModifyListener() {
 
 			@Override
 			public void modifyText(ModifyEvent arg0) {
+				projectComposer.setProjectName(projectNameText.getText().trim());
 				validate();
-				productNameText.setText(xcodeProjectNameText.getText());
+				
 			}
 		});
+		
+		Label packageNameLabel = new Label(projectNameGroup, SWT.NONE);
+		packageNameLabel.setText("Package Name:");
 
-		keepXcodeButton = new Button(projectGroup, SWT.CHECK);
-		keepXcodeButton.setText("Keep Xcode Project");
-		keepXcodeButton.addListener(SWT.Selection, new Listener() {
+		packageNameText = new Text(projectNameGroup, SWT.SINGLE | SWT.BORDER);
+		packageNameText.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+		packageNameText.addModifyListener(new ModifyListener() {
 
 			@Override
-			public void handleEvent(Event event) {
-				switch (event.type) {
-				case SWT.Selection: {
-					xcodePathGroup.setVisible(keepXcodeButton.getSelection());
-				}
-					break;
-				}
+			public void modifyText(ModifyEvent arg0) {
+				projectComposer.setPackageName(packageNameText.getText().trim());
+				bundleIdentifier.setText(BUNDLE_ID + projectComposer.getBundleID());
+				validate();
 			}
 		});
-
-		xcodePathGroup = new Group(projectGroup, SWT.NONE);
-		xcodePathGroup.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
-		GridLayout xcodePathLayout = new GridLayout();
-		xcodePathLayout.numColumns = 2;
-		xcodePathGroup.setLayout(xcodePathLayout);
-		xcodePathGroup.setVisible(false);
-
-		xcodePathLabel = new Label(xcodePathGroup, SWT.NONE);
-		xcodePathLabel.setText("Xcode Project Path:");
-
-		xcodePathText = new Text(xcodePathGroup, SWT.SINGLE | SWT.BORDER);
-		xcodePathText.addModifyListener(new ValidateListener());
-		xcodePathText.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
-		xcodePathText.setText("xcode");
 
 		Group bundleGroup = new Group(parent, SWT.NONE);
 		bundleGroup.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
@@ -126,23 +106,41 @@ public class XcodeWizardPage extends AbstractWizardPage {
 		bundleLayout.numColumns = 2;
 		bundleGroup.setLayout(bundleLayout);
 
-		Label productNameLabel = new Label(bundleGroup, SWT.NONE);
-		productNameLabel.setText("Product Name:");
-		productNameText = new Text(bundleGroup, SWT.SINGLE | SWT.BORDER);
-		productNameText.addModifyListener(new ValidateListener());
-		productNameText.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
-
 		Label organizationNameLabel = new Label(bundleGroup, SWT.NONE);
 		organizationNameLabel.setText("Organization Name:");
 		organizationNameText = new Text(bundleGroup, SWT.SINGLE | SWT.BORDER);
-		organizationNameText.addModifyListener(new ValidateListener());
+		organizationNameText.addModifyListener(new ModifyListener() {
+
+			@Override
+			public void modifyText(ModifyEvent arg0) {
+				projectComposer.setOrganizationName(organizationNameText.getText().trim());
+				validate();
+			}
+		});
 		organizationNameText.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
 
 		Label companyIdentifierLabel = new Label(bundleGroup, SWT.NONE);
 		companyIdentifierLabel.setText("Company Identifier:");
 		companyIdentifierText = new Text(bundleGroup, SWT.SINGLE | SWT.BORDER);
-		companyIdentifierText.addModifyListener(new ValidateListener());
+		companyIdentifierText.addModifyListener(new ModifyListener() {
+
+			@Override
+			public void modifyText(ModifyEvent arg0) {
+				projectComposer.setOrganizationID(companyIdentifierText.getText().trim());
+				bundleIdentifier.setText(BUNDLE_ID + projectComposer.getBundleID());
+				validate();
+			}
+		});
 		companyIdentifierText.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+		
+		Group bundleIdGroup = new Group(parent, SWT.NONE);
+		bundleIdGroup.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+		GridLayout bundleIdLayout = new GridLayout();
+		bundleIdLayout.numColumns = 1;
+		bundleIdGroup.setLayout(bundleIdLayout);
+		
+		bundleIdentifier = new Label(bundleIdGroup, SWT.NONE);
+		bundleIdentifier.setText("Application Bundle Id} = {Organization Identifier}.{Product Name}");
 
 		setPageComplete(false);
 		validate();
@@ -158,8 +156,7 @@ public class XcodeWizardPage extends AbstractWizardPage {
 		IWizardPage nextPage = super.getNextPage();
 		if (nextPage instanceof ProjecrSettingsPage) {
 			ProjecrSettingsPage settingsPage = (ProjecrSettingsPage)nextPage;
-			settingsPage.setProjectName(xcodeProjectNameText.getText().trim());
-			settingsPage.setLocation(getDefaultDirectory());
+			settingsPage.setProjectName(projectNameText.getText().trim());
 		}
 		return nextPage;
 	}
@@ -168,68 +165,31 @@ public class XcodeWizardPage extends AbstractWizardPage {
 		return organizationNameText.getText().trim();
 	}
 
-	public String getProductName() {
-		return productNameText.getText().trim();
-	}
-
-	public String getXcodeProjectPath() {
-		return xcodePathText.getText().trim();
-	}
-
-	public boolean isKeepXcodeProject() {
-		return keepXcodeButton.getSelection();
-	}
-
 	public String getCompanyIdentifier() {
 		return companyIdentifierText.getText().trim();
+	}
+	
+	public String getPackageName() {
+		return packageNameText.getText().trim();
 	}
 
 	protected boolean validate() {
 		setMessage(null);
 		setErrorMessage(null);
-		if (xcodeProjectNameText.getText().trim().isEmpty()) {
-			setErrorMessage("Enter a Xcode Project Name");
-			return false;
-		}
-
-		if (productNameText.getText().trim().isEmpty()) {
-			setErrorMessage("Enter a Product Name");
-			return false;
-		}
-
-		if (organizationNameText.getText().trim().isEmpty()) {
-			setErrorMessage("Enter a Organization Name");
-			return false;
-		}
-
-		if (companyIdentifierText.getText().trim().isEmpty()) {
-			setErrorMessage("Enter a Company Identifier");
-			return false;
-		}
-
-		if (!validJavaPackagePattern.matcher(productNameText.getText()).matches()
-				|| !validJavaPackagePattern.matcher(xcodeProjectNameText.getText()).matches()) {
-			setErrorMessage(
-					"Product Name or Project Name is invalid!\n" + "1) Allowed word characters (a-zA-Z_0-9) and dots.\n"
-							+ "2) Segments between dots must be of non-zero length.\n"
-							+ "3) A digit cannot be the first character.");
-		}
-
-		if (keepXcodeButton.getSelection()) {
-			if (xcodePathText.getText().trim().isEmpty()) {
-				setErrorMessage("Enter a Xcode Project Path");
-				return false;
-			}
-		}
+		
+		try {
+            projectComposer.validate(
+            		PROJECT_NAME,
+                    PACKAGE_NAME,
+                    ORGANIZATION_NAME,
+                    ORGANIZATION_IDENTIFIER);
+        } catch (MOEProjectComposer.MOEProjectComposerValidationException e) {
+        	setPageComplete(false);
+        	setErrorMessage(e.getMessage());
+        }
 
 		setPageComplete(true);
 		return true;
-	}
-
-	private String getDefaultDirectory() {
-		IWorkspace workspace = ResourcesPlugin.getWorkspace();
-		IPath path = workspace.getRoot().getLocation();
-		return path.toOSString();
 	}
 
 }

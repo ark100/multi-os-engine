@@ -17,38 +17,41 @@
 package org.moe.wizards;
 
 import java.io.File;
-import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
 
-import org.eclipse.core.resources.IProject;
+import org.eclipse.buildship.core.CorePlugin;
+import org.eclipse.buildship.core.workspace.GradleBuild;
+import org.eclipse.buildship.core.workspace.NewProjectHandler;
 import org.eclipse.core.resources.IWorkspace;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.wizard.Wizard;
 import org.eclipse.ui.INewWizard;
 import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.actions.WorkspaceModifyOperation;
-import org.moe.generator.project.Generator;
-import org.moe.generator.project.ProjectTemplate;
-import org.moe.generator.project.config.Configuration;
-import org.moe.gradle.GradleTask;
+import org.moe.generator.project.MOEProjectComposer;
+import org.moe.generator.project.MOEProjectComposer.MOEProjectComposerException;
+import org.moe.generator.project.MOEProjectComposer.Template;
 import org.moe.utils.MessageFactory;
+
+import com.gradleware.tooling.toolingclient.GradleDistribution;
+import com.gradleware.tooling.toolingmodel.repository.FixedRequestAttributes;
 
 public abstract class AbstractProjectWizard extends Wizard implements INewWizard {
 
 	private XcodeWizardPage xcodeWizardPage;
-	private ProjecrSettingsPage projecrSettingsPage;
-	private String mainClassName = "Main";
+	private ProjecrSettingsPage projectSettingsPage;
 	private String error = null;
-	private boolean isNewProject = true;
 
 	public enum TemplateType {
-		SingleView, SingleViewStoryboard, PageBased, PageBasedStoryboard, Game, MasterDetail, Tabbed,
+		MasterDetail, PageBased, SingleView, Tabbed, Game
 	}
 
-	protected abstract TemplateType getTemplateType();
+	protected abstract Template getTemplateType();
 
 	public AbstractProjectWizard() {
 		super();
@@ -60,30 +63,27 @@ public abstract class AbstractProjectWizard extends Wizard implements INewWizard
 	public boolean performFinish() {
 
 		error = null;
-
-		final ProjectTemplate projectTemplate = new ProjectTemplate();
-
+		
+		final MOEProjectComposer projectComposer = new MOEProjectComposer();
+		
 		String organizationName = xcodeWizardPage.getOrganizationName();
-		String productName = xcodeWizardPage.getProductName();
 
-		String packageName = "com." + organizationName + "." + productName;
-		packageName = packageName.replace(" ", "").trim().toLowerCase();
+		String packageName = xcodeWizardPage.getPackageName();
 
-		String projectPath = projecrSettingsPage.getProjectRoot();
-		final String projectName = projecrSettingsPage.getProjectName();
-
-		projectTemplate.rootPath(projectPath).packageName(packageName).projectName(productName)
-				.organizationName(organizationName).companyIdentifier(xcodeWizardPage.getCompanyIdentifier())
-				.mainClassName(mainClassName).keepXcode(xcodeWizardPage.isKeepXcodeProject())
-				.xcodeProjectPath(xcodeWizardPage.getXcodeProjectPath()).useEclipse(true);
-
-		final File projectFile = new File(projectPath);
-
-		Configuration configuartion = new Configuration("1.0.0");
-		configuartion.setProjectRoot(projectFile);
-		configuartion.setGradleVersion(projecrSettingsPage.getGradleVersion());
-
-		final Generator projectGenerator = new Generator(configuartion);
+		IWorkspace workspace = ResourcesPlugin.getWorkspace();
+		IPath projectPath = projectSettingsPage.getProjectLocationPath();
+		IPath path = projectPath == null ? workspace.getRoot().getLocation() : projectPath;
+		final String projectName = projectSettingsPage.getProjectName();
+		final File projectFile = projectSettingsPage.isUseDefault() ? new File(path.toOSString() , projectName) : new File(path.toOSString());
+		
+		projectComposer.setTargetDirectory(projectFile)
+        .setMoeVersion("1.4.+")
+        .setProjectName(projectName)
+        .setOrganizationName(organizationName)
+        .setOrganizationID(xcodeWizardPage.getCompanyIdentifier())
+        .setPackageName(packageName)
+        .setSubproject(false)
+        .setTemplate(getTemplateType());
 
 		WorkspaceModifyOperation workspaceModifiy = new WorkspaceModifyOperation() {
 
@@ -91,41 +91,19 @@ public abstract class AbstractProjectWizard extends Wizard implements INewWizard
 			protected void execute(IProgressMonitor monitor)
 					throws CoreException, InvocationTargetException, InterruptedException {
 
-				try {
-					projectGenerator.createGradleWrapper();
-				} catch (Exception e) {
-					throw new CoreException(MessageFactory.getError("Unable create gradle wrapper", e));
-				}
 				monitor.worked(1);
 
 				monitor.beginTask("Create project...", 4);
 
-				projectTemplate.createProject(getTemplateType().toString().toLowerCase() + ".zip", "1.1.+",
-						isNewProject);
-				monitor.worked(1);
-
-				int gradleResult = -1;
-				String gradleOutput = "";
-
 				try {
-					GradleTask eclipseTask = new GradleTask(projectFile, "eclipse", null, monitor);
-					gradleResult = eclipseTask.run();
-					gradleOutput = eclipseTask.getOutput();
-				} catch (IOException ignore) {
-					System.out.println("Gradle error: " + ignore.getMessage());
+					projectComposer.compose();
+				} catch (MOEProjectComposerException e) {
+					throw new CoreException(MessageFactory.getError("Generator error", e));
 				}
-
-				if (gradleResult != 0) {
-					throw new CoreException(MessageFactory.getError("Unable run eclipse command: " + gradleOutput));
-				}
+				
 				monitor.worked(1);
-
-				IWorkspace workspace = ResourcesPlugin.getWorkspace();
-				IProject project = workspace.getRoot().getProject(projectName);
-				if (project != null) {
-					project.create(monitor);
-					project.open(monitor);
-				}
+				
+				performImportProject(NewProjectHandler.IMPORT_AND_MERGE, projectFile);
 				monitor.worked(1);
 			}
 		};
@@ -144,7 +122,7 @@ public abstract class AbstractProjectWizard extends Wizard implements INewWizard
 		}
 
 		if (error != null) {
-			MessageFactory.showErrorDialog("Error", error);
+			MessageFactory.showErrorDialog(error);
 			return false;
 		}
 
@@ -162,9 +140,20 @@ public abstract class AbstractProjectWizard extends Wizard implements INewWizard
 		super.addPages();
 
 		xcodeWizardPage = new XcodeWizardPage("Xcode Settings");
-		projecrSettingsPage = new ProjecrSettingsPage("Project Settings");
+		projectSettingsPage = new ProjecrSettingsPage("Project Settings");
 		addPage(xcodeWizardPage);
-		addPage(projecrSettingsPage);
+		addPage(projectSettingsPage);
 	}
+	
+	public boolean performImportProject(NewProjectHandler newProjectHandler, File projectDir) {
+        FixedRequestAttributes rootRequestAttributes = toFixedAttributes(projectDir);
+        GradleBuild build = CorePlugin.gradleWorkspaceManager().getGradleBuild(rootRequestAttributes);
+        build.synchronize(newProjectHandler);
+        return true;
+    }
+	
+	public FixedRequestAttributes toFixedAttributes(File projectDir) {
+        return new FixedRequestAttributes(projectDir, null, GradleDistribution.fromBuild(), null, new ArrayList<String>(), new ArrayList<String>());
+    }
 
 }

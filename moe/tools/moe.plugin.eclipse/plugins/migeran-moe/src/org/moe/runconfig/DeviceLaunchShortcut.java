@@ -14,13 +14,23 @@
  * limitations under the License.
  */
 
-package org.moe.wizards;
+package org.moe.runconfig;
 
-public class SingleViewStoryboardProjectWizard extends AbstractProjectWizard {
+import org.eclipse.debug.core.ILaunchConfigurationWorkingCopy;
+
+public class DeviceLaunchShortcut extends AbstractLaunchShortcut {
+
+	public static final String NAME = "Device";
+	public static final String DEVICE_CONFIGURATION_SUFFIX = " (" + NAME + ")";
 
 	@Override
-	protected TemplateType getTemplateType() {
-		return TemplateType.SingleViewStoryboard;
+	protected void setTargetDevice(ILaunchConfigurationWorkingCopy workingCopy) {
+		workingCopy.setAttribute(ApplicationManager.RUN_ON_SIMULATOR_KEY, false);
+	}
+
+	@Override
+	protected String getConfigurationSuffix() {
+		return DEVICE_CONFIGURATION_SUFFIX;
 	}
 
 }

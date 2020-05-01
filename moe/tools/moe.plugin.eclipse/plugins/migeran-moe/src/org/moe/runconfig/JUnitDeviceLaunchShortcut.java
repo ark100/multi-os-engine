@@ -14,13 +14,24 @@
  * limitations under the License.
  */
 
-package org.moe.wizards;
+package org.moe.runconfig;
 
-public class PageBasedStoryboardProjectWizard extends AbstractProjectWizard {
+import org.eclipse.debug.core.ILaunchConfigurationWorkingCopy;
+
+public class JUnitDeviceLaunchShortcut extends DeviceLaunchShortcut {
+
+	public static final String NAME = "JUnit Device";
+	public static final String DEVICE_CONFIGURATION_SUFFIX = " (" + NAME + ")";
 
 	@Override
-	protected TemplateType getTemplateType() {
-		return TemplateType.PageBasedStoryboard;
+	protected void setTargetDevice(ILaunchConfigurationWorkingCopy workingCopy) {
+		workingCopy.setAttribute(ApplicationManager.RUN_ON_SIMULATOR_KEY, false);
+		setJUNitDefaultValues(workingCopy);
+	}
+
+	@Override
+	protected String getConfigurationSuffix() {
+		return DEVICE_CONFIGURATION_SUFFIX;
 	}
 
 }
