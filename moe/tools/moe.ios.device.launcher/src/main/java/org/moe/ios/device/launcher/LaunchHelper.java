@@ -16,6 +16,10 @@ limitations under the License.
 
 package org.moe.ios.device.launcher;
 
+import org.libimobiledevice.enums.debugserver_error_t;
+import org.libimobiledevice.enums.idevice_error_t;
+import org.libimobiledevice.opaque.debugserver_client_t;
+import org.libimobiledevice.opaque.idevice_t;
 import org.moe.common.Port;
 import org.moe.common.ProxyPort;
 import org.moe.common.ShutdownManager;
@@ -30,14 +34,17 @@ import org.moe.natj.general.ptr.Ptr;
 import org.moe.natj.general.ptr.impl.PtrFactory;
 import org.moe.protocol.gdbremote.GDBRemoteProtocol;
 import org.moe.protocol.gdbremote.IStopReplyListener;
-import org.libimobiledevice.enums.debugserver_error_t;
-import org.libimobiledevice.enums.idevice_error_t;
-import org.libimobiledevice.opaque.debugserver_client_t;
-import org.libimobiledevice.opaque.idevice_t;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -135,11 +142,12 @@ public class LaunchHelper implements IStopReplyListener {
      * @param device  device
      * @param appPath application path on device
      * @param config  configuration
+     * @throws DeviceException if a device error occurs
      */
     private LaunchHelper(idevice_t device, String appPath, Configuration config) throws DeviceException {
         this.device = device;
         this.config = config;
-        Ptr<BytePtr> udidRef = (Ptr<BytePtr>) PtrFactory.newPointerPtr(Byte.class, 2, 1, true, false);
+        Ptr<BytePtr> udidRef = (Ptr<BytePtr>)PtrFactory.newPointerPtr(Byte.class, 2, 1, true, false);
         if (idevice_get_udid(device, udidRef) != idevice_error_t.IDEVICE_E_SUCCESS) {
             throw new DeviceException("Failed to get device UDID from device");
         }
@@ -153,20 +161,32 @@ public class LaunchHelper implements IStopReplyListener {
     }
 
     /**
-     * Launch an application on the specified device
+     * Launch an application on the specified device.
      *
      * @param device  device
      * @param appPath application path on device
      * @param config  configuration
-     * @throws DeviceException
+     * @throws DeviceException if a device error occurs
      */
     public static void launch(idevice_t device, String appPath, Configuration config) throws DeviceException {
-        if (Configuration.INSTALL_MODE_INSTALL_ONLY.equals(config.getInstallMode()) ||
-                Configuration.INSTALL_MODE_UPGRADE_ONLY.equals(config.getInstallMode())) {
+        if (Configuration.INSTALL_MODE_INSTALL_ONLY.equals(config.getInstallMode())
+                || Configuration.INSTALL_MODE_UPGRADE_ONLY.equals(config.getInstallMode())) {
             return;
         }
-        LaunchHelper runHelper = new LaunchHelper(device, appPath, config);
-        runHelper.launch();
+        try {
+            boolean isFirstTry = true;
+            while (true) {
+                LaunchHelper runHelper = new LaunchHelper(device, appPath, config);
+                if (runHelper.launch(isFirstTry)) {
+                    isFirstTry = false;
+                    Thread.sleep(500);
+                } else {
+                    break;
+                }
+            }
+        } catch (InterruptedException e) {
+            LOG.debug("Sleep interrupted", e);
+        }
     }
 
     /**
@@ -190,10 +210,14 @@ public class LaunchHelper implements IStopReplyListener {
     /**
      * Launch the application on the device.
      *
+     * @param isFirstTry tells whether or not this is the fist attempt to launch
+     * @return Returns whether or not to retry the launching.
      * @throws DeviceException If an error occurred
      */
-    private void launch() throws DeviceException {
-        Main.PRINT_CONTROL("Launching:");
+    private boolean launch(boolean isFirstTry) throws DeviceException {
+        if (isFirstTry) {
+            Main.PRINT_CONTROL("Launching:");
+        }
 
         // Get supported archs
         List<String> cpuTypes = null;
@@ -206,7 +230,7 @@ public class LaunchHelper implements IStopReplyListener {
                     File plist = new File(file, "Info.plist");
                     HashMap<String, Object> plistData = PlistHelper.readFromFile(plist);
                     if (plistData != null) {
-                        execName = (String) plistData.get("CFBundleExecutable");
+                        execName = (String)plistData.get("CFBundleExecutable");
                     }
                 } catch (Exception ignore) {
                     // Ignore
@@ -258,7 +282,7 @@ public class LaunchHelper implements IStopReplyListener {
                         try {
                             stdPipeOutput.flush();
                         } catch (IOException ignore) {
-                            
+
                         }
                         try {
                             stdPipeOutput.close();
@@ -268,7 +292,7 @@ public class LaunchHelper implements IStopReplyListener {
                         try {
                             pipedInputStream.close();
                         } catch (IOException ignore) {
-                            
+
                         }
                     }
                 });
@@ -283,38 +307,35 @@ public class LaunchHelper implements IStopReplyListener {
         Socket sockProxy = null;
         InputStream is = null;
         OutputStream os = null;
-        if(config.getDebugserverPort() != null){
+        if (config.getDebugserverPort() != null) {
             proxy = DebugserverProxy.create(debugServer, config.getDebugserverPort().getLocalPort());
             try {
                 sockProxy = new Socket("localhost", config.getDebugserverPort().getLocalPort());
                 sockProxy.setReuseAddress(true);
                 is = sockProxy.getInputStream();
                 os = sockProxy.getOutputStream();
-            } catch(Exception e) {
+            } catch (Exception e) {
                 System.out.println("SERVER----error on socket!");
-                try{
-                    if(is != null)
-                        is.close();
-                } catch (IOException ignore){
+                try {
+                    if (is != null) is.close();
+                } catch (IOException ignore) {
                     //ignore
                 }
-                try{
-                    if(os != null)
-                        os.close();
-                } catch (IOException ignore){
+                try {
+                    if (os != null) os.close();
+                } catch (IOException ignore) {
                     //ignore
                 }
-                try{
-                    if(sockProxy != null)
-                        sockProxy.close();
-                } catch (IOException ignore){
+                try {
+                    if (sockProxy != null) sockProxy.close();
+                } catch (IOException ignore) {
                     //ignore
                 }
-                if(proxy!=null){
+                if (proxy != null) {
                     proxy.waitFor();
                     proxy.stop();
                 }
-                return;
+                return false;
             }
         }
 
@@ -324,7 +345,7 @@ public class LaunchHelper implements IStopReplyListener {
         ConnectionOutputStream<debugserver_client_t> dscos = ConnectionHelper.getOutputStream(debugServer, dscosLock);
         try {
             try {
-                if(config.getDebugserverPort()!=null){
+                if (config.getDebugserverPort() != null) {
                     protocol = new GDBRemoteProtocol(is, os);
                     protocol.addListener(this);
                 } else {
@@ -363,64 +384,64 @@ public class LaunchHelper implements IStopReplyListener {
                 protocol.send_Arguments(_args.toArray(args_arr));
 
                 // Check launch success
-                if (protocol.query_LaunchSuccess() != 0) {
-                    if(config.getDebugserverPort()!=null){
+                String query_launchSuccess = protocol.query_LaunchSuccess();
+                if ("Locked".equals(query_launchSuccess)) {
+                    if (isFirstTry) {
+                        LOG.info("Please unlock your device");
+                    }
+                    return true;
+                }
+                if (query_launchSuccess != null) {
+                    if (config.getDebugserverPort() != null) {
                         protocol.close();
-                        try{
-                            if(is != null)
-                            is.close();
-                        } catch (IOException e){
+                        try {
+                            if (is != null) is.close();
+                        } catch (IOException e) {
                             //ignore
                         }
-                        try{
-                            if(os != null)
-                            os.close();
-                        } catch (IOException e){
+                        try {
+                            if (os != null) os.close();
+                        } catch (IOException e) {
                             //ignore
                         }
-                        try{
-                            if(sockProxy != null)
-                                sockProxy.close();
-                        } catch (IOException e){
+                        try {
+                            if (sockProxy != null) sockProxy.close();
+                        } catch (IOException e) {
                             //ignore
                         }
-                        if(proxy!=null){
+                        if (proxy != null) {
                             proxy.waitFor();
                             proxy.stop();
                         }
                     }
-                    throw new DeviceException("Failed to launch application on device");
+                    throw new DeviceException("Failed to launch application on device: " + query_launchSuccess);
                 }
 
-                if(config.getDebugserverPort()!=null){
+                if (config.getDebugserverPort() != null) {
                     protocol.close();
-                    try{
-                        if(is != null)
-                            is.close();
-                    } catch (IOException e){
+                    try {
+                        if (is != null) is.close();
+                    } catch (IOException e) {
                         //ignore
                     }
-                    try{
-                        if(os != null)
-                            os.close();
-                    } catch (IOException e){
+                    try {
+                        if (os != null) os.close();
+                    } catch (IOException e) {
                         //ignore
                     }
-                    try{
-                        if(sockProxy != null)
-                            sockProxy.close();
-                    } catch (IOException e){
+                    try {
+                        if (sockProxy != null) sockProxy.close();
+                    } catch (IOException e) {
                         //ignore
                     }
-                    if(proxy!=null){
+                    if (proxy != null) {
                         proxy.waitFor();
                         proxy.stop();
                     }
                     proxy = DebugserverProxy.create(debugServer, config.getDebugserverPort().getLocalPort());
-                } else{
+                } else {
                     // Continue app
-                    protocol.send_vCont(GDBRemoteProtocol.VCONT_ACTION_CONTINUE,
-                        GDBRemoteProtocol.THREAD_ID_ANY);
+                    protocol.send_vCont(GDBRemoteProtocol.VCONT_ACTION_CONTINUE, GDBRemoteProtocol.THREAD_ID_ANY);
                 }
 
                 if (debugPort != null) {
@@ -438,6 +459,12 @@ public class LaunchHelper implements IStopReplyListener {
                     public void run() {
                         try {
                             protocol.send_ctrl_C();
+                            // TODO: this sleep is just a workaround, there is possibly a better fix for this
+                            try {
+                                Thread.sleep(500);
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
                             protocol.send_k();
                             try {
                                 waitingThread.join(5000);
@@ -453,8 +480,7 @@ public class LaunchHelper implements IStopReplyListener {
                 USBDeviceWatcher.IUSBDeviceListener listener = new USBDeviceWatcher.IUSBDeviceListener() {
                     @Override
                     public void handle(int event, String deviceUDID) {
-                        if (deviceUDID.equals(udid) &&
-                                event == DeviceHelper.CONN_EVENT_REMOVE) {
+                        if (deviceUDID.equals(udid) && event == DeviceHelper.CONN_EVENT_REMOVE) {
                             signalProcessEnded(false);
                         }
                     }
@@ -473,25 +499,22 @@ public class LaunchHelper implements IStopReplyListener {
         } finally {
             dscisLock.lockAndClose();
             dscosLock.lockAndClose();
-            try{
-                if(is != null)
-                    is.close();
-            } catch (IOException e){
+            try {
+                if (is != null) is.close();
+            } catch (IOException e) {
                 //ignore
             }
-            try{
-                if(os != null)
-                    os.close();
-            } catch (IOException e){
+            try {
+                if (os != null) os.close();
+            } catch (IOException e) {
                 //ignore
             }
-            try{
-                if(sockProxy != null)
-                    sockProxy.close();
-            } catch (IOException e){
+            try {
+                if (sockProxy != null) sockProxy.close();
+            } catch (IOException e) {
                 //ignore
             }
-            if(proxy != null) {
+            if (proxy != null) {
                 proxy.waitFor();
                 proxy.stop();
             }
@@ -499,6 +522,7 @@ public class LaunchHelper implements IStopReplyListener {
             dscisLock.unlock();
             dscosLock.unlock();
         }
+        return false;
     }
 
     @Override
@@ -571,6 +595,12 @@ public class LaunchHelper implements IStopReplyListener {
             } catch (InterruptedException e) {
                 try {
                     protocol.send_ctrl_C();
+                    // TODO: this sleep is just a workaround, there is possibly a better fix for this
+                    try {
+                        Thread.sleep(500);
+                    } catch (InterruptedException e2) {
+                        e2.printStackTrace();
+                    }
                     protocol.send_k();
                 } catch (IOException ignore) {
                     // Ignore

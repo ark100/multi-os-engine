@@ -16,10 +16,10 @@ limitations under the License.
 
 package org.moe.ios.device.launcher;
 
+import org.libimobiledevice.opaque.idevice_t;
 import org.moe.common.ShutdownManager;
 import org.moe.common.configuration.ConfigurationValidationException;
 import org.moe.common.utils.NativeUtil;
-import org.libimobiledevice.opaque.idevice_t;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,23 +36,23 @@ public class Main {
      */
     private static final Logger LOG = LoggerFactory.getLogger(Main.class);
 
+    /**
+     * Loads native libraries.
+     *
+     * @throws IOException if an I/O error occures
+     */
     private static void loadNativeLibraries() throws IOException {
-        String current = new java.io.File( "." ).getCanonicalPath();
+        String current = new java.io.File(".").getCanonicalPath();
 
         String osName = NativeUtil.getUnifiedSystemName();
 
-        if(osName.equals(NativeUtil.OS_NAME_MAC_OS_X)) {
+        if (osName.equals(NativeUtil.OS_NAME_MAC_OS_X)) {
             System.load(current + "/macosx/x86_64/libnatj.dylib");
             System.load(current + "/macosx/x86_64/libimobiledevice.dylib");
-        }
-        else if(osName.equals(NativeUtil.OS_NAME_WINDOWS)) {
+        } else if (osName.equals(NativeUtil.OS_NAME_WINDOWS)) {
             System.load(current + "/windows/x86_64/natj.dll");
-
-            System.load(current + "/windows/x86_64/libeay32.dll");
-            System.load(current + "/windows/x86_64/ssleay32.dll");
             System.load(current + "/windows/x86_64/libimobiledevice.dll");
-        }
-        else {
+        } else {
             throw new RuntimeException("Unsupported OS");
         }
     }
@@ -74,6 +74,12 @@ public class Main {
         this.config = config;
     }
 
+    /**
+     * Main.
+     *
+     * @param args Program arguments
+     * @throws IOException if an I/O error occurs
+     */
     public static void main(String[] args) throws IOException {
         // Read configuration
         Configuration config = ConfigurationAppender.read(args);
@@ -153,7 +159,6 @@ public class Main {
         System.out.flush();
     }
 
-  
     /**
      * Prints an error related string on std err, with ERROR: prefix.
      *

@@ -16,15 +16,15 @@ limitations under the License.
 
 package org.moe.ios.device;
 
-import org.moe.natj.general.ptr.BytePtr;
-import org.moe.natj.general.ptr.IntPtr;
 import org.libimobiledevice.opaque.debugserver_client_t;
 import org.libimobiledevice.opaque.idevice_connection_t;
+import org.moe.natj.general.ptr.BytePtr;
+import org.moe.natj.general.ptr.IntPtr;
 
 import static org.libimobiledevice.c.Globals.*;
 
 /**
- * This class provides helper methods for connection creation & management.
+ * This class provides helper methods for connection creation &amp; management.
  */
 public class ConnectionHelper {
 
@@ -38,16 +38,19 @@ public class ConnectionHelper {
     /**
      * Creates a new ConnectionInputStream for a debugserver_client_t object.
      *
-     * @param client debugserver_client_t object
+     * @param client    debugserver_client_t object
+     * @param usageLock Connection lock
      * @return new ConnectionInputStream instance
      */
-    public static ConnectionInputStream<debugserver_client_t> getInputStream(debugserver_client_t client, final ConnectionLock usageLock) {
+    public static ConnectionInputStream<debugserver_client_t> getInputStream(debugserver_client_t client,
+            final ConnectionLock usageLock) {
         if (client == null) {
             throw new NullPointerException();
         }
         return new ConnectionInputStream<debugserver_client_t>(client) {
             @Override
-            protected int recvImpl(debugserver_client_t handle, BytePtr buffer, int len, IntPtr recvBytes, int timeout) {
+            protected int recvImpl(debugserver_client_t handle, BytePtr buffer, int len, IntPtr recvBytes,
+                    int timeout) {
                 try {
                     if (usageLock.lockGetClosed()) {
                         return -1;
@@ -63,10 +66,12 @@ public class ConnectionHelper {
     /**
      * Creates a new ConnectionOutputStream for a debugserver_client_t object.
      *
-     * @param client debugserver_client_t object
+     * @param client    debugserver_client_t object
+     * @param usageLock Connection lock
      * @return new ConnectionOutputStream instance
      */
-    public static ConnectionOutputStream<debugserver_client_t> getOutputStream(debugserver_client_t client, final ConnectionLock usageLock) {
+    public static ConnectionOutputStream<debugserver_client_t> getOutputStream(debugserver_client_t client,
+            final ConnectionLock usageLock) {
         if (client == null) {
             throw new NullPointerException();
         }
@@ -89,15 +94,18 @@ public class ConnectionHelper {
      * Creates a new ConnectionInputStream for a idevice_connection_t object.
      *
      * @param connection idevice_connection_t object
+     * @param usageLock  Connection lock
      * @return new ConnectionInputStream instance
      */
-    public static ConnectionInputStream<idevice_connection_t> getInputStream(idevice_connection_t connection, final ConnectionLock usageLock) {
+    public static ConnectionInputStream<idevice_connection_t> getInputStream(idevice_connection_t connection,
+            final ConnectionLock usageLock) {
         if (connection == null) {
             throw new NullPointerException();
         }
         return new ConnectionInputStream<idevice_connection_t>(connection) {
             @Override
-            protected int recvImpl(idevice_connection_t handle, BytePtr buffer, int len, IntPtr recvBytes, int timeout) {
+            protected int recvImpl(idevice_connection_t handle, BytePtr buffer, int len, IntPtr recvBytes,
+                    int timeout) {
                 try {
                     if (usageLock.lockGetClosed()) {
                         return -1;
@@ -114,9 +122,11 @@ public class ConnectionHelper {
      * Creates a new ConnectionOutputStream for a idevice_connection_t object.
      *
      * @param connection idevice_connection_t object
+     * @param usageLock  Connection lock
      * @return new ConnectionOutputStream instance
      */
-    public static ConnectionOutputStream<idevice_connection_t> getOutputStream(idevice_connection_t connection, final ConnectionLock usageLock) {
+    public static ConnectionOutputStream<idevice_connection_t> getOutputStream(idevice_connection_t connection,
+            final ConnectionLock usageLock) {
         if (connection == null) {
             throw new NullPointerException();
         }
