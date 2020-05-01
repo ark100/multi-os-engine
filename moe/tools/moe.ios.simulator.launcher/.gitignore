@@ -1,20 +1,6 @@
-# Output directories & Gradle
-.gradle
-bin
 build
-out
-
-# Idea
-moe.ios.simulator.launcher.iml
-moe.ios.simulator.launcher.ipr
-moe.ios.simulator.launcher.iws
-
-# Eclipse
+simlauncher.xcodeproj/xcuserdata
+simlauncher.xcodeproj/project.xcworkspace/xcuserdata
+.settings
 .classpath
 .project
-.settings
-
-# Other
-log
-logs
-.idea

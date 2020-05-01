@@ -1,5 +1,5 @@
 /*
-Copyright 2014-2016 Intel Corporation
+Copyright (C) 2016 Migeran
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,94 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-apply plugin: 'java'
-apply plugin: 'idea'
-apply plugin: 'eclipse'
-apply plugin: 'maven-publish'
+apply plugin: 'base'
 
-sourceCompatibility = "1.6"
-targetCompatibility = "1.6"
+task buildLauncher(type: Exec) {
+    executable 'xcodebuild'
+    args '-project', 'simlauncher.xcodeproj'
+    args '-target', 'simlauncher'
+    args '-configuration', 'Release'
 
-// Versioning
-ext {
-    moeProject = 'MOE_IOS_SIMULATOR_LAUNCHER'
-    moeVersion = [:]
+    def log = file("build/xcodebuild.log")
+    mkdir log.parentFile
+    FileOutputStream ostream = new FileOutputStream(log);
+    setErrorOutput(ostream)
+    setStandardOutput(ostream)
 }
-initMOEProject(project, [vMajor: 1, vMinor: 3, vPatch: 0])
-
-repositories {
-    mavenLocal()
-    mavenCentral()
-}
-
-configurations {
-    natives
-}
-
-dependencies {
-    compile 'org.moe:natj-api:1.0.+'
-    compile 'org.slf4j:slf4j-api:1.7.7'
-    compile 'org.slf4j:slf4j-simple:1.7.7'
-    compile 'org.moe:moeCommonUtils:1.1.+'
-    compile 'org.moe:moeMacCore:1.1.+'
-
-    natives('org.moe:natj-mac:1.0.+') {
-        artifact {
-            name = 'natj-mac'
-            extension = 'dylib'
-            type = 'dylib'
-            classifier = 'Release'
-        }
-    }
-
-    testCompile 'junit:junit:4.11'
-    testCompile('org.moe:moeCommonUtils:1.1.+') {
-        artifact {
-            name = 'moeCommonUtils'
-            type = 'jar'
-            classifier = 'test-common'
-        }
-    }
-}
-
-sourceSets {
-    main {
-        resources {
-            srcDirs('src/main/resources', 'build/natives')
-        }
-    }
-}
-
-jar {
-    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
-    manifest { attributes 'Main-Class': 'org.moe.ios.simulator.launcher.Main' }
-}
-
-publishing {
-    publications {
-        mavenJava(MavenPublication) {
-            groupId 'org.moe'
-            artifactId 'moeIosSimulatorLauncher'
-
-            from components.java
-        }
-    }
-}
-
-/*
-Copy native lib.
- */
- /* moving native libraries outside of jar
-task copyNatJNative(type: Copy) {
-    from configurations.natives
-    into 'build/natives/macosx/x86_64/'
-    rename { String filename ->
-        if (filename.startsWith("natj-mac")) {
-            'libnatj.dylib'
-        } else {
-            throw new IllegalArgumentException("unknown library " + filename);
-        }
-    }
-}
-processResources.dependsOn copyNatJNative
-*/
+tasks.build.dependsOn buildLauncher
