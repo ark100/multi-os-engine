@@ -1,0 +1,9 @@
+build
+.idea
+*.iml
+.project
+.classpath
+.settings
+bin
+xcuserdata/
+project.xcworkspace/
